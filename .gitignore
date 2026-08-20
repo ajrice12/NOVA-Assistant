@@ -1,0 +1,77 @@
+# ==========================================================
+# NOVA Assistant Git Ignore
+# ==========================================================
+
+# Secrets / credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.token
+credentials.json
+credentials*.json
+token.json
+token*.json
+secrets/
+.secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Runtime/cache
+cache/
+.cache/
+logs/
+*.log
+tmp/
+temp/
+
+# Builds
+dist/
+
+# Large AI model weights
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.onnx
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# NOVA local user information
+user_data/
+local_data/
+
+# NOVA generated/deployment workspace
+work/
+
+# Framework build output
+.next/
+.vinext/
+.wrangler/
+
+# Package caches
+npm-cache/
+.npm/
+
+# Generated archives
+*.tgz
