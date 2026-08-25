@@ -553,7 +553,7 @@ export default function Home() {
           <section className="briefing" aria-labelledby="briefing-title">
             <div className="brief-copy">
               <div className="eyebrow">{localDate} · {localTime} {timeZone ? `· ${timeZone.replaceAll("_", " ")}` : "· Device time"}</div>
-              <h1 id="briefing-title">{greeting},<br />Shannon.</h1>
+              <h1 id="briefing-title">{greeting},<br />Austin.</h1>
               <p>{assistantNote}</p>
               <div className="brief-actions">
                 <button className="primary-button" onClick={() => document.getElementById("news")?.scrollIntoView({ behavior: "smooth" })}>Read live briefing <span>→</span></button>
@@ -662,7 +662,7 @@ export default function Home() {
                 </div>
                 <div className="email-excerpt">
                   <span>Original message</span>
-                  <p>Hi Shannon,</p>
+                  <p>Hi Austin,</p>
                   <p>{selected.preview} I wanted to make sure this reached you and give you time to plan the next step.</p>
                   <p>Best,<br />{selected.sender.split(" ")[0]}</p>
                 </div>
