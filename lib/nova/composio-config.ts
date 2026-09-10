@@ -10,7 +10,14 @@ const PROVIDERS = {
     versionKey: "COMPOSIO_GMAIL_TOOL_VERSION",
     defaultTool: "GMAIL_FETCH_EMAILS",
     defaultVersion: "20260903_00",
-    arguments: {},
+    arguments: {
+      user_id: "me",
+      query: "in:inbox newer_than:7d",
+      max_results: 10,
+      include_payload: false,
+      verbose: false,
+      ids_only: false,
+    },
   },
   outlook: {
     authConfigKey: "COMPOSIO_OUTLOOK_AUTH_CONFIG_ID",

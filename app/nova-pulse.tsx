@@ -1,11 +1,21 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { answerPulse, buildPulseReport, type PulseWorkspace } from "@/lib/nova/pulse";
+
+type SyncProvider = "gmail" | "outlook" | "linkedin";
 
 type PulseData = PulseWorkspace & {
   user: { displayName: string; email: string };
 };
+
+const AUTO_SYNC_PRIORITY: readonly SyncProvider[] = ["gmail", "outlook", "linkedin"];
+const EMAIL_PROVIDERS: readonly SyncProvider[] = ["gmail", "outlook"];
+const AUTO_SYNC_INTERVAL_MS = 10 * 60_000;
+
+function providerName(provider: SyncProvider) {
+  return provider === "gmail" ? "Gmail" : provider === "outlook" ? "Outlook" : "LinkedIn";
+}
 
 function formatReportTime(value: number | null) {
   if (!value) return "Needs action";
@@ -21,6 +31,7 @@ export default function NovaPulse() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [lastChecked, setLastChecked] = useState<number | null>(null);
+  const automaticSyncInFlight = useRef(false);
 
   const load = useCallback(async () => {
     try {
@@ -42,6 +53,17 @@ export default function NovaPulse() {
     }
   }, []);
 
+  const syncProvider = useCallback(async (provider: SyncProvider) => {
+    const response = await fetch("/api/nova/sync", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider }),
+    });
+    const payload = await response.json() as { count?: number; error?: string };
+    if (!response.ok) throw new Error(payload.error || `${providerName(provider)} could not be checked.`);
+    return payload.count ?? 0;
+  }, []);
+
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void load(), 0);
     const interval = window.setInterval(() => void load(), 60_000);
@@ -51,13 +73,56 @@ export default function NovaPulse() {
     };
   }, [load]);
 
+  useEffect(() => {
+    if (!signedIn || !data || automaticSyncInFlight.current) return;
+    const provider = AUTO_SYNC_PRIORITY.find((candidate) =>
+      data.connections.some((connection) => connection.provider === candidate && connection.status === "active"),
+    );
+    if (!provider) return;
+
+    const key = `nova-pulse:last-auto-sync:${data.user.email}:${provider}`;
+    let lastAutomaticSync = 0;
+    try {
+      lastAutomaticSync = Number(window.localStorage.getItem(key) ?? 0);
+    } catch {
+      // A privacy-restricted browser can still perform the in-memory check.
+    }
+    if (Date.now() - lastAutomaticSync < AUTO_SYNC_INTERVAL_MS) return;
+
+    const automaticSync = window.setTimeout(() => {
+      automaticSyncInFlight.current = true;
+      try {
+        window.localStorage.setItem(key, String(Date.now()));
+      } catch {
+        // Persistence is an optimization; the read-only sync still works without it.
+      }
+      setChecking(true);
+      setAnswer(`Checking ${providerName(provider)} and preparing your login notes…`);
+      void syncProvider(provider)
+        .then(async (count) => {
+          await load();
+          setAnswer(count
+            ? `${count} recent ${providerName(provider)} item${count === 1 ? "" : "s"} checked, summarized, and saved as notes.`
+            : `${providerName(provider)} is connected. I found no recent items to add.`);
+        })
+        .catch(() => {
+          setAnswer(`I could not refresh ${providerName(provider)} just now, so I am showing your last saved reports.`);
+        })
+        .finally(() => {
+          setChecking(false);
+          automaticSyncInFlight.current = false;
+        });
+    }, 0);
+    return () => window.clearTimeout(automaticSync);
+  }, [data, load, signedIn, syncProvider]);
+
   const report = useMemo(() => data ? buildPulseReport(data) : null, [data]);
 
   async function checkEmail() {
     if (!data) return;
-    const providers = data.connections
-      .filter((connection) => ["gmail", "outlook"].includes(connection.provider) && connection.status === "active")
-      .map((connection) => connection.provider);
+    const providers = EMAIL_PROVIDERS.filter((provider) =>
+      data.connections.some((connection) => connection.provider === provider && connection.status === "active"),
+    );
     if (!providers.length) {
       setAnswer("Connect Gmail or Outlook before checking email.");
       return;
@@ -67,14 +132,7 @@ export default function NovaPulse() {
     let failure = "";
     for (const provider of providers) {
       try {
-        const response = await fetch("/api/nova/sync", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ provider }),
-        });
-        const payload = await response.json() as { count?: number; error?: string };
-        if (!response.ok) throw new Error(payload.error || `${provider} could not be checked.`);
-        imported += payload.count ?? 0;
+        imported += await syncProvider(provider);
       } catch (error) {
         failure = error instanceof Error ? error.message : "An email account could not be checked.";
       }
@@ -129,7 +187,7 @@ export default function NovaPulse() {
         <label htmlFor="nova-pulse-question">Ask about your updates</label>
         <div><input id="nova-pulse-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What changed?" /><button disabled={!data || !question.trim()} aria-label="Ask NOVA">↑</button></div>
       </form>
-      <footer>Routine reports · 0 model calls</footer>
+      <footer>Auto-checks on login + every 10 minutes · 0 model calls</footer>
     </>}
   </aside>;
 }

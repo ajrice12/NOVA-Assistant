@@ -6,6 +6,7 @@ import { CONNECTOR_CATALOG } from "../lib/nova/connectors.ts";
 import type { ActionRequest, ConnectedAccount, NormalizedEvent, PlannerItem } from "../lib/nova/domain.ts";
 import { rankJob } from "../lib/nova/jobs.ts";
 import { chunkText, eventToMemory, rankMemory } from "../lib/nova/memory.ts";
+import { normalizeComposioResult } from "../lib/nova/normalize-composio.ts";
 import { detectPlannerConflicts } from "../lib/nova/planner.ts";
 import { evaluateAction } from "../lib/nova/policy.ts";
 import { answerPulse, buildPulseReport } from "../lib/nova/pulse.ts";
@@ -147,6 +148,20 @@ test("NOVA Pulse turns saved items and connection issues into short zero-call re
   assert.equal(report.items[0].title, "Outlook needs attention");
   assert.match(answerPulse("Any email?", workspace), /Security alert/);
   assert.match(answerPulse("What is the cost?", workspace), /0 model calls/);
+});
+
+test("Gmail previews become useful, newest-first NOVA notes", () => {
+  const items = normalizeComposioResult("gmail", {
+    response_data: {
+      messages: [
+        { messageId: "older", sender: "Jordan <jordan@example.com>", subject: "Project plan", preview: "The launch checklist is ready for review.", messageTimestamp: "2026-08-20T10:00:00.000Z" },
+        { messageId: "newer", sender: "Casey <casey@example.com>", subject: "Interview update", messageText: "Your interview moved to Friday at 2 PM.", messageTimestamp: "2026-08-20T11:00:00.000Z" },
+      ],
+    },
+  });
+  assert.equal(items[0].externalId, "newer");
+  assert.match(items[0].title, /Casey/);
+  assert.match(items[0].content, /Friday at 2 PM/);
 });
 
 test("Composio client uses Connect Links and blocks unreviewed tools", async () => {
