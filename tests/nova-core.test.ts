@@ -8,6 +8,7 @@ import { rankJob } from "../lib/nova/jobs.ts";
 import { chunkText, eventToMemory, rankMemory } from "../lib/nova/memory.ts";
 import { detectPlannerConflicts } from "../lib/nova/planner.ts";
 import { evaluateAction } from "../lib/nova/policy.ts";
+import { answerPulse, buildPulseReport } from "../lib/nova/pulse.ts";
 import { ComposioReadOnlyClient, verifyComposioWebhook } from "../lib/nova/providers/composio.ts";
 import { processNovaContext } from "../lib/nova/runtime.ts";
 import { summarizeWithoutModel } from "../lib/nova/summarize.ts";
@@ -133,6 +134,19 @@ test("restricted records never enter memory and first-pass summaries use zero mo
   assert.equal(summary.modelCalls, 0);
   assert.match(summary.summary, /launch Friday/);
   assert.ok(summary.keyPoints.length > 0);
+});
+
+test("NOVA Pulse turns saved items and connection issues into short zero-call reports", () => {
+  const workspace = {
+    briefing: "Two items are saved.",
+    sources: [{ id: "source-1", title: "Security alert", summary: "A new device signed in.", sourceType: "email", provider: "gmail", updatedAt: now.getTime() }],
+    connections: [{ provider: "gmail", status: "active" }, { provider: "outlook", status: "connecting" }],
+  };
+  const report = buildPulseReport(workspace);
+  assert.equal(report.badgeCount, 2);
+  assert.equal(report.items[0].title, "Outlook needs attention");
+  assert.match(answerPulse("Any email?", workspace), /Security alert/);
+  assert.match(answerPulse("What is the cost?", workspace), /0 model calls/);
 });
 
 test("Composio client uses Connect Links and blocks unreviewed tools", async () => {

@@ -442,3 +442,43 @@ button { cursor: pointer; }
   .knowledge-detail { padding: 27px 20px; }
   .knowledge-detail > footer { align-items: flex-start; flex-direction: column; }
 }
+
+/* NOVA Pulse */
+.nova-pulse-launcher { position: fixed; right: 22px; bottom: 86px; z-index: 48; min-height: 48px; padding: 0 15px; display: flex; align-items: center; gap: 8px; border: 1px solid #41463b; background: var(--ink); color: var(--white); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
+.nova-pulse-launcher > span { color: var(--acid); font-size: 15px; }
+.nova-pulse-launcher strong { font-size: 10px; letter-spacing: .13em; }
+.nova-pulse-launcher b { min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: 50%; background: var(--acid); color: var(--ink); font-size: 9px; }
+.nova-pulse { position: fixed; right: 22px; bottom: 86px; z-index: 48; width: min(370px, calc(100vw - 32px)); max-height: min(660px, calc(100vh - 110px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #41463b; background: var(--white); color: var(--ink); box-shadow: 0 24px 70px rgba(0,0,0,.32); }
+.nova-pulse-head { min-height: 54px; padding: 0 14px 0 17px; display: flex; align-items: center; justify-content: space-between; background: var(--ink); color: var(--white); }
+.nova-pulse-head > div { display: flex; align-items: center; gap: 8px; }
+.nova-pulse-head span { color: var(--acid); }
+.nova-pulse-head strong { font-size: 10px; letter-spacing: .14em; }
+.nova-pulse-head small { padding-left: 8px; border-left: 1px solid #50554a; color: #a8ada1; font-size: 9px; }
+.nova-pulse-head > button { width: 32px; height: 32px; border: 1px solid #454a40; background: transparent; color: var(--white); font-size: 16px; }
+.nova-pulse-feed { min-height: 180px; max-height: 370px; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; background: var(--paper); }
+.nova-pulse-bubble { max-width: 91%; padding: 12px 14px; background: var(--ink); color: var(--white); align-self: flex-start; }
+.nova-pulse-bubble span { color: var(--acid); font-size: 8px; font-weight: 900; letter-spacing: .13em; }
+.nova-pulse-bubble p { margin: 7px 0 0; font-family: Georgia, serif; font-size: 14px; line-height: 1.45; }
+.nova-pulse-bubble a { display: inline-block; margin-top: 11px; color: var(--acid); font-size: 10px; font-weight: 900; }
+.nova-pulse-report { padding: 12px 13px; align-self: stretch; border: 1px solid var(--line); border-left: 3px solid var(--ink); background: var(--white); }
+.nova-pulse-report.attention { border-left-color: #b78328; background: #fff9e8; }
+.nova-pulse-report > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.nova-pulse-report strong { display: block; margin-top: 7px; font-family: Georgia, serif; font-size: 15px; font-weight: 400; }
+.nova-pulse-report p { margin: 6px 0 0; color: #5d6158; font-size: 11px; line-height: 1.45; }
+.nova-pulse-actions { padding: 10px 13px; display: flex; gap: 8px; border-top: 1px solid var(--line); background: var(--white); }
+.nova-pulse-actions button { flex: 1; min-height: 34px; border: 1px solid var(--ink); background: transparent; color: var(--ink); font-size: 9px; font-weight: 900; }
+.nova-pulse-actions button:first-child { background: var(--acid); }
+.nova-pulse-actions button:disabled { opacity: .45; }
+.nova-pulse-form { padding: 0 13px 10px; background: var(--white); }
+.nova-pulse-form > label { display: block; margin: 2px 0 7px; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.nova-pulse-form > div { min-height: 42px; display: flex; border: 1px solid var(--line); background: var(--paper); }
+.nova-pulse-form input { min-width: 0; flex: 1; border: 0; outline: 0; padding: 0 12px; background: transparent; color: var(--ink); font-size: 13px; }
+.nova-pulse-form button { width: 42px; border: 0; background: var(--ink); color: var(--acid); font-size: 15px; }
+.nova-pulse-form button:disabled { opacity: .45; }
+.nova-pulse > footer { padding: 0 13px 11px; color: var(--muted); background: var(--white); font-size: 8px; text-align: right; }
+
+@media (max-width: 600px) {
+  .nova-pulse, .nova-pulse-launcher { right: 12px; bottom: 76px; }
+  .nova-pulse { width: calc(100vw - 24px); max-height: calc(100vh - 96px); }
+  .nova-pulse-feed { max-height: 46vh; }
+}
