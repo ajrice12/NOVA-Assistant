@@ -14,6 +14,7 @@ The current public version demonstrates:
 - search, filtering, archive, completion, and command interactions
 - responsive desktop and mobile layouts
 - an optional Windows startup launcher
+- NOVA Core architecture for provider-independent connectors, consent, event normalization, alerts, planning, memory, and approval-gated actions
 
 > The inbox preview uses demonstration data and is labeled in the interface. Calendar events remain empty until a real account is authorized. The browser contacts regional data providers directly and falls back to approximate network location when precise browser access is blocked; device location is not written to NOVA's database.
 
@@ -51,11 +52,17 @@ At future Windows sign-ins, a hidden launcher waits until the hosted NOVA site i
 
 ## Roadmap
 
-1. Secure OAuth connections for Outlook and Gmail
-2. Calendar, Drive, Slack, and task-system connectors
-3. Retrieval-augmented search over approved work content
-4. Action approvals, audit history, and user-controlled memory
-5. Optional packaged Windows desktop shell and voice interface
+1. Connect Composio to email in read-only mode and validate normalized events
+2. Add calendar sync, deadline extraction, and conflict detection
+3. Add retrieval-augmented search over user-approved work content
+4. Add draft suggestions, explicitly approved write actions, and a complete audit trail
+5. Add market monitoring, background workers, notifications, and voice
+
+## Architecture
+
+- [NOVA architecture](docs/NOVA_ARCHITECTURE.md)
+- [Connector contract](docs/CONNECTOR_CONTRACT.md)
+- [Security and privacy](docs/SECURITY_AND_PRIVACY.md)
 
 ## Technology
 

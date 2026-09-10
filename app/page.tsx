@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CONNECTOR_CATALOG } from "@/lib/nova/connectors";
+import { NOVA_CORE_VERSION } from "@/lib/nova/domain";
 
 type Category = "All" | "Priority" | "Work" | "Interviews" | "Opportunities" | "Events";
 
@@ -153,6 +155,37 @@ type ContextData = {
   updatedAt: string;
 };
 
+type NewsApiItem = Record<string, unknown>;
+
+type WeatherApiResponse = {
+  timezone: string;
+  current: {
+    temperature_2m: number;
+    apparent_temperature: number;
+    is_day: number;
+    precipitation: number;
+    weather_code: number;
+    wind_speed_10m: number;
+  };
+  daily: {
+    time: string[];
+    weather_code: number[];
+    temperature_2m_max: number[];
+    temperature_2m_min: number[];
+    precipitation_probability_max: number[];
+  };
+};
+
+type PlaceApiResponse = {
+  city?: string;
+  locality?: string;
+  principalSubdivision?: string;
+  countryName?: string;
+  countryCode?: string;
+};
+
+type NetworkLocationResponse = Record<string, unknown>;
+
 type LocationState = "locating" | "live" | "denied" | "unavailable";
 type LocationSource = "precise" | "network";
 
@@ -189,9 +222,9 @@ function weatherLabel(code: number) {
   return "Thunderstorms";
 }
 
-function normalizeNewsItem(item: Record<string, any>): NewsStory {
+function normalizeNewsItem(item: NewsApiItem): NewsStory {
   const titleParts = String(item.title || "").split(" - ");
-  const source = titleParts.length > 1 ? titleParts.pop() || "News" : item.author || "News";
+  const source = titleParts.length > 1 ? titleParts.pop() || "News" : String(item.author || "News");
   return {
     title: titleParts.join(" - ") || String(item.title || "Untitled story"),
     url: String(item.link || "#"),
@@ -267,8 +300,8 @@ export default function Home() {
 
       const [weatherResponse, placeResponse] = await Promise.all([fetch(weatherUrl), fetch(placeUrl)]);
       if (!weatherResponse.ok || !placeResponse.ok) throw new Error("A regional data provider is temporarily unavailable.");
-      const weather = await weatherResponse.json() as Record<string, any>;
-      const place = await placeResponse.json() as Record<string, any>;
+      const weather = await weatherResponse.json() as WeatherApiResponse;
+      const place = await placeResponse.json() as PlaceApiResponse;
       const city = place.city || place.locality || place.principalSubdivision || "Your area";
       const region = place.principalSubdivision || "Current region";
       const country = place.countryName || "United States";
@@ -281,7 +314,7 @@ export default function Home() {
       const [localNewsResult, nationalNewsResult] = await Promise.allSettled([fetch(toNewsApi(localFeed)), fetch(toNewsApi(nationalFeed))]);
       const readNews = async (result: PromiseSettledResult<Response>) => {
         if (result.status !== "fulfilled" || !result.value.ok) return [];
-        const payload = await result.value.json() as { items?: Array<Record<string, any>> };
+        const payload = await result.value.json() as { items?: NewsApiItem[] };
         return (payload.items || []).slice(0, 5).map(normalizeNewsItem);
       };
       const [localNews, nationalNews] = await Promise.all([readNews(localNewsResult), readNews(nationalNewsResult)]);
@@ -336,11 +369,11 @@ export default function Home() {
       const providers = [
         {
           url: "https://ipwho.is/",
-          read: (data: Record<string, any>) => ({ latitude: Number(data.latitude), longitude: Number(data.longitude), valid: data.success !== false }),
+          read: (data: NetworkLocationResponse) => ({ latitude: Number(data.latitude), longitude: Number(data.longitude), valid: data.success !== false }),
         },
         {
           url: "https://ipapi.co/json/",
-          read: (data: Record<string, any>) => ({ latitude: Number(data.latitude), longitude: Number(data.longitude), valid: !data.error }),
+          read: (data: NetworkLocationResponse) => ({ latitude: Number(data.latitude), longitude: Number(data.longitude), valid: !data.error }),
         },
       ];
       let coordinates: { latitude: number; longitude: number } | null = null;
@@ -349,7 +382,7 @@ export default function Home() {
         try {
           const response = await fetch(provider.url, { cache: "no-store" });
           if (!response.ok) continue;
-          const candidate = provider.read(await response.json() as Record<string, any>);
+          const candidate = provider.read(await response.json() as NetworkLocationResponse);
           if (candidate.valid && Number.isFinite(candidate.latitude) && Number.isFinite(candidate.longitude)) {
             coordinates = { latitude: candidate.latitude, longitude: candidate.longitude };
             break;
@@ -372,7 +405,9 @@ export default function Home() {
   }, [loadContext]);
 
   useEffect(() => {
-    setNow(new Date());
+    const scheduledTasks: number[] = [];
+    const schedule = (task: () => void) => scheduledTasks.push(window.setTimeout(task, 0));
+    schedule(() => setNow(new Date()));
     const clock = window.setInterval(() => setNow(new Date()), 1000);
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => undefined);
 
@@ -383,19 +418,20 @@ export default function Home() {
         const coordinates = JSON.parse(stored) as { latitude: number; longitude: number; source?: LocationSource };
         if (Number.isFinite(coordinates.latitude) && Number.isFinite(coordinates.longitude)) {
           hasStoredLocation = true;
-          loadContext(coordinates.latitude, coordinates.longitude, true, coordinates.source === "network" ? "network" : "precise");
+          schedule(() => void loadContext(coordinates.latitude, coordinates.longitude, true, coordinates.source === "network" ? "network" : "precise"));
         }
       } catch {
         window.localStorage.removeItem("nova-last-location");
       }
     }
 
-    if (!hasStoredLocation) loadNetworkLocation(true);
+    if (!hasStoredLocation) schedule(() => void loadNetworkLocation(true));
 
     if (!("geolocation" in navigator)) {
-      loadNetworkLocation(true);
+      schedule(() => void loadNetworkLocation(true));
       const networkRefresh = window.setInterval(() => loadNetworkLocation(false), 900_000);
       return () => {
+        scheduledTasks.forEach((task) => window.clearTimeout(task));
         window.clearInterval(clock);
         window.clearInterval(networkRefresh);
       };
@@ -415,6 +451,7 @@ export default function Home() {
     const networkRefresh = window.setInterval(() => loadNetworkLocation(false), 900_000);
 
     return () => {
+      scheduledTasks.forEach((task) => window.clearTimeout(task));
       window.clearInterval(clock);
       window.clearInterval(networkRefresh);
       navigator.geolocation.clearWatch(watch);
@@ -477,18 +514,23 @@ export default function Home() {
     } else if (lower.includes("time") || lower.includes("location") || lower.includes("where am")) {
       setAssistantNote(contextData ? `This device is calibrated to ${contextData.location.city}, ${contextData.location.region}. Local time is ${localTime}.` : `This device reports ${localTime}. Enable location to identify the current region.`);
     } else if (lower.includes("calendar") || lower.includes("schedule") || lower.includes("plan")) {
-      setAssistantNote("No calendar is connected, so I won’t invent plans. Connect Google Calendar or Outlook Calendar to display real events.");
+      setAssistantNote("The planner and conflict engine are ready, but no calendar is authorized. NOVA will not invent events; connect Google or Outlook Calendar when integration testing begins.");
+    } else if (lower.includes("connect") || lower.includes("architecture") || lower.includes("core")) {
+      document.getElementById("core")?.scrollIntoView({ behavior: "smooth" });
+      setAssistantNote(`NOVA Core ${NOVA_CORE_VERSION} is ready for connector testing: consent controls, event normalization, alerts, planning, memory, and audit boundaries are in place.`);
+    } else if (lower.includes("deadline") || lower.includes("remind") || lower.includes("alert")) {
+      document.getElementById("core")?.scrollIntoView({ behavior: "smooth" });
+      setAssistantNote("The deadline and alert engine is ready. It will begin reporting real obligations only after an authorized source supplies them.");
     } else if (lower.includes("interview")) {
       setFilter("Interviews");
       setSelectedId(1);
-      setAssistantNote("I found one interview email. Your final round is tomorrow at 2:00 PM, and a portfolio walkthrough is expected.");
+      setAssistantNote("The preview contains one demonstration interview email. Connect a live inbox before NOVA treats any interview or deadline as real.");
     } else if (lower.includes("opportunit") || lower.includes("job")) {
-      setFilter("Opportunities");
-      setSelectedId(4);
-      setAssistantNote("There is one new role worth reviewing: Director of Operations, $175–210K plus equity.");
+      document.getElementById("core")?.scrollIntoView({ behavior: "smooth" });
+      setAssistantNote("The job-matching core is ready. NOVA needs an approved resume profile and a live job source before it reports real opportunities.");
     } else if (lower.includes("priority") || lower.includes("urgent")) {
       setFilter("Priority");
-      setAssistantNote("Two priority messages need attention: confirm tomorrow's interview and own the Q3 measurement plan.");
+      setAssistantNote("Two demonstration messages are marked priority. A connected inbox is required before NOVA reports real urgent mail.");
     } else {
       setAssistantNote(`I’m ready to help with “${request}.” Device context is live; account data will appear only after you connect the relevant app.`);
     }
@@ -516,7 +558,7 @@ export default function Home() {
             ["Home", "⌂"],
             ["Inbox", "✉"],
             ["Calendar", "◫"],
-            ["Knowledge", "◇"],
+            ["Core", "✦"],
           ].map(([name, icon]) => (
             <button
               key={name}
@@ -524,7 +566,8 @@ export default function Home() {
               onClick={() => {
                 setActiveNav(name);
                 if (name === "Inbox") document.getElementById("inbox")?.scrollIntoView({ behavior: "smooth" });
-                else flash(`${name} workspace ready for the next build phase`);
+                else if (name === "Calendar" || name === "Core") document.getElementById("core")?.scrollIntoView({ behavior: "smooth" });
+                else window.scrollTo({ top: 0, behavior: "smooth" });
               }}
               aria-label={name}
               title={name}
@@ -535,7 +578,7 @@ export default function Home() {
           ))}
         </nav>
         <div className="rail-bottom">
-          <button className="rail-button" onClick={() => flash("Connector setup opens in the integration phase")} aria-label="Settings" title="Settings">
+          <button className="rail-button" onClick={() => document.getElementById("connections")?.scrollIntoView({ behavior: "smooth" })} aria-label="Settings" title="Settings">
             <span>⚙</span><small>Settings</small>
           </button>
           <button className="avatar" aria-label="Your profile">SO</button>
@@ -545,8 +588,8 @@ export default function Home() {
       <section className="workspace">
         <header className="topbar">
           <div className="wordmark">NOVA <span>work intelligence</span></div>
-          <div className={locationState === "live" ? "system-status" : "system-status pending"}><i /> {locationState === "live" ? `${locationSource === "network" ? "Approximate" : "Precise"} context live` : locationState === "locating" ? "Calibrating device" : "Location unavailable"} <span>Apps not connected</span></div>
-          <button className="connect-button" onClick={() => document.getElementById("connections")?.scrollIntoView({ behavior: "smooth" })}>＋ Connect app</button>
+          <div className={locationState === "live" ? "system-status" : "system-status pending"}><i /> {locationState === "live" ? `${locationSource === "network" ? "Approximate" : "Precise"} context live` : locationState === "locating" ? "Calibrating device" : "Location unavailable"} <span>0 work accounts authorized</span></div>
+          <a className="connect-button" href="/workspace">Open workspace →</a>
         </header>
 
         <div className="content">
@@ -596,7 +639,39 @@ export default function Home() {
             <article><span>Local time</span><strong>{new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone }).format(now)}</strong><small>{timeZone?.replaceAll("_", " ") || "Device timezone"}</small></article>
             <article><span>Current weather</span><strong>{contextData ? `${contextData.weather.temperature}°` : "--"}</strong><small>{contextData?.weather.condition || "Waiting for location"}</small></article>
             <article><span>Geographic region</span><strong className="region-value">{contextData?.location.region || "Unknown"}</strong><small>{contextData ? `${contextData.location.city}, ${contextData.location.country} · ${locationSource === "network" ? "approximate" : "precise"}` : "Waiting for automatic calibration"}</small></article>
-            <article className="focus-signal"><span>Real plans only</span><p>No calendar is connected. Add Google or Outlook Calendar to show your actual day.</p><button onClick={() => document.getElementById("connections")?.scrollIntoView({ behavior: "smooth" })}>Connect calendar →</button></article>
+            <article className="focus-signal"><span>Planner guardrail</span><p>No calendar is connected, so NOVA will not invent events or deadlines.</p><button onClick={() => document.getElementById("core")?.scrollIntoView({ behavior: "smooth" })}>Review the core →</button></article>
+          </section>
+
+          <section id="core" className="core-section" aria-labelledby="core-title">
+            <div className="core-heading">
+              <div><span className="eyebrow">Internal architecture · version {NOVA_CORE_VERSION}</span><h2 id="core-title">A private workspace for connected knowledge.</h2></div>
+              <p>NOVA stores user-scoped information in its own durable data layer. Composio can handle OAuth and provider access without owning NOVA’s data model, summaries, or brand.</p>
+            </div>
+
+            <div className="core-principles">
+              <article><span>01 · Observe</span><h3>Read only by default</h3><p>Every account starts with the smallest approved scope. Disconnected sources contribute nothing.</p><b>Consent policy ready</b></article>
+              <article><span>02 · Understand</span><h3>One event language</h3><p>Email, calendars, jobs, files, markets, and messages normalize into the same auditable event stream.</p><b>Normalizer ready</b></article>
+              <article><span>03 · Plan</span><h3>Deadlines without fiction</h3><p>Deterministic urgency rules, schedule-conflict detection, and daily briefings operate only on sourced records.</p><b>Alert engine ready</b></article>
+              <article><span>04 · Protect</span><h3>Approval before action</h3><p>Drafting and execution are separated. Sending mail or changing a calendar always requires explicit approval.</p><b>Action gate ready</b></article>
+            </div>
+
+            <div className="core-pipeline" aria-label="NOVA processing pipeline">
+              <span>Authorized source</span><i>→</i><span>Incremental sync</span><i>→</i><span>Privacy filter</span><i>→</i><span>Event store</span><i>→</i><span>Alerts + RAG</span><i>→</i><span>Approval gate</span>
+            </div>
+
+            <div className="connector-foundation">
+              <div className="connector-foundation-head"><div><span className="eyebrow">Connector broker</span><h3>Accounts and quick capture</h3></div><p>{CONNECTOR_CATALOG.length} defined adapters · permanent notes · cached summaries</p></div>
+              <div className="connector-cards">
+                {CONNECTOR_CATALOG.map((connector) => <article key={connector.provider}>
+                  <div><i>{connector.name.slice(0, 1)}</i><span>{connector.category}</span></div>
+                  <h4>{connector.name}</h4>
+                  <p>{connector.description}</p>
+                  <footer><b className={connector.provider === "device" ? "ready" : "waiting"}>{connector.provider === "device" ? "Live" : "Account required"}</b><span>{connector.capabilities.length} capabilities</span></footer>
+                </article>)}
+              </div>
+            </div>
+
+            <div className="core-privacy"><span>Zero silent actions</span><p>Connected content remains user-scoped. Unchanged records reuse their saved summaries, and every external write still requires approval.</p><a href="/workspace">Open your private workspace →</a></div>
           </section>
 
           <section id="news" className="news-section" aria-labelledby="news-title">
@@ -616,7 +691,7 @@ export default function Home() {
               <div><span className="eyebrow">Sample workspace · email connection required</span><h2 id="inbox-title">Priority inbox preview</h2></div>
               <div className="inbox-tools">
                 <label className="search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search everything" aria-label="Search email" /></label>
-                <button onClick={() => flash("NOVA rescanned both connected inboxes")}>↻ <span>Refresh</span></button>
+                <button onClick={() => flash("No live inbox is connected; demo messages were left unchanged")}>↻ <span>Refresh</span></button>
               </div>
             </div>
 
@@ -675,9 +750,9 @@ export default function Home() {
           </section>
 
           <footer id="connections" className="connectors">
-            <span>Connection center</span>
+            <span>NOVA Core {NOVA_CORE_VERSION}</span>
             <div><i className="connected-device">✓</i> This device <b>●</b><i>O</i> Outlook <b>●</b><i>G</i> Google <b>●</b><i>D</i> Drive <b>●</b><i>S</i> Slack</div>
-            <button onClick={() => flash("Choose Google Calendar or Outlook Calendar in Codex to authorize real plans.")}>Connect work apps →</button>
+            <a href="/workspace">Open knowledge workspace →</a>
           </footer>
         </div>
 
