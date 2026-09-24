@@ -121,6 +121,12 @@ export class ComposioReadOnlyClient {
     return this.request<ComposioConnectedAccountList>(`/connected_accounts?${query.toString()}`, { method: "GET" });
   }
 
+  listAllConnectedAccounts() {
+    const query = new URLSearchParams({ limit: "100" });
+    query.append("statuses", "ACTIVE");
+    return this.request<ComposioConnectedAccountList>(`/connected_accounts?${query.toString()}`, { method: "GET" });
+  }
+
   executeActionTool(input: ExecuteActionToolInput) {
     const toolSlug = input.toolSlug.toUpperCase();
     if (!input.confirmed) throw new Error("Explicit confirmation is required before external execution.");

@@ -58,7 +58,6 @@ function formatDate(value: number | null) {
 }
 
 export default function WorkspaceClient({ user }: { user: { displayName: string; email: string } }) {
-  const isLocalDemo = user.email.endsWith("@nova.dev");
   const [data, setData] = useState<WorkspaceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
@@ -220,7 +219,7 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
             {provider.limit && <small>{provider.limit}</small>}
             <footer>
               <span>{connection ? `Last sync: ${formatDate(connection.lastSyncAt)}` : "Read only to start"}</span>
-              {isLocalDemo && connection ? <span>Demo loaded</span> : connection ? <button onClick={() => sync(provider.id)} disabled={busyProvider === provider.id}>{busyProvider === provider.id ? "Working…" : "Sync now"}</button>
+              {connection ? <button onClick={() => sync(provider.id)} disabled={busyProvider === provider.id}>{busyProvider === provider.id ? "Working…" : "Sync now"}</button>
                 : <button onClick={() => connect(provider.id)} disabled={busyProvider === provider.id}>{busyProvider === provider.id ? "Opening…" : "Connect"}</button>}
             </footer>
           </article>;

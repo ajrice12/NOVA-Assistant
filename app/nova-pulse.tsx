@@ -12,8 +12,8 @@ type PulseData = PulseWorkspace & {
 type ChatReference = { id: string; title: string; source: string; summary: string; priority: string; why: string; requiresResponse: boolean; canonicalUrl?: string };
 type Draft = { recipient: string; subject: string; tone: string; body: string };
 
-const AUTO_SYNC_PRIORITY: readonly SyncProvider[] = ["gmail", "outlook", "linkedin"];
-const EMAIL_PROVIDERS: readonly SyncProvider[] = ["gmail", "outlook"];
+const AUTO_SYNC_PRIORITY: readonly SyncProvider[] = ["gmail", "linkedin"];
+const EMAIL_PROVIDERS: readonly SyncProvider[] = ["gmail"];
 const AUTO_SYNC_INTERVAL_MS = 10 * 60_000;
 
 function providerName(provider: SyncProvider) {
@@ -80,7 +80,6 @@ export default function NovaPulse() {
 
   useEffect(() => {
     if (!signedIn || !data || automaticSyncInFlight.current) return;
-    if (data.user.email.endsWith("@nova.dev")) return;
     const provider = AUTO_SYNC_PRIORITY.find((candidate) =>
       data.connections.some((connection) => connection.provider === candidate && connection.status === "active"),
     );
@@ -126,10 +125,6 @@ export default function NovaPulse() {
 
   async function checkEmail() {
     if (!data) return;
-    if (data.user.email.endsWith("@nova.dev")) {
-      setAnswer("Local demonstration data is already loaded. Connect a real account in the hosted NOVA workspace for live sync.");
-      return;
-    }
     const providers = EMAIL_PROVIDERS.filter((provider) =>
       data.connections.some((connection) => connection.provider === provider && connection.status === "active"),
     );

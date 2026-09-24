@@ -22,11 +22,18 @@ export async function POST(request: Request) {
 
   try {
     const client = new ComposioReadOnlyClient({ apiKey: config.apiKey, readToolAllowlist: [config.toolSlug] });
+    let composioUserId = user.userId;
+    if (user.userId === "local-development-user") {
+      const accounts = await client.listAllConnectedAccounts();
+      const account = accounts.items.find((item) => item.id === connection.external_account_id && item.status === "ACTIVE");
+      if (!account || account.toolkit.slug.toLowerCase() === "outlook") throw new Error("The live development connection is unavailable.");
+      composioUserId = account.user_id;
+    }
     const result = await client.executeReadTool({
       toolSlug: config.toolSlug,
       version: config.toolVersion,
       connectedAccountId: connection.external_account_id,
-      userId: user.userId,
+      userId: composioUserId,
       arguments: config.arguments,
     });
     if (!result.successful) throw new Error(result.error || "Provider sync failed.");
