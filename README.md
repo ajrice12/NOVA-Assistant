@@ -15,6 +15,8 @@ The current public version demonstrates:
 - responsive desktop and mobile layouts
 - an optional Windows startup launcher
 - NOVA Core architecture for provider-independent connectors, consent, event normalization, alerts, planning, memory, and approval-gated actions
+- grounded assistant chat over synced sources, explainable message priority, rich references, and editable reply drafts
+- an exact-action confirmation boundary with safe mock execution as the default
 
 > The inbox preview uses demonstration data and is labeled in the interface. Calendar events remain empty until a real account is authorized. The browser contacts regional data providers directly and falls back to approximate network location when precise browser access is blocked; device location is not written to NOVA's database.
 
@@ -63,6 +65,7 @@ At future Windows sign-ins, a hidden launcher waits until the hosted NOVA site i
 - [NOVA architecture](docs/NOVA_ARCHITECTURE.md)
 - [Connector contract](docs/CONNECTOR_CONTRACT.md)
 - [Security and privacy](docs/SECURITY_AND_PRIVACY.md)
+- [AI command center and safe actions](docs/AI_COMMAND_CENTER.md)
 
 ## Technology
 

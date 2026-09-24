@@ -9,6 +9,9 @@ type PulseData = PulseWorkspace & {
   user: { displayName: string; email: string };
 };
 
+type ChatReference = { id: string; title: string; source: string; summary: string; priority: string; why: string; requiresResponse: boolean; canonicalUrl?: string };
+type Draft = { recipient: string; subject: string; tone: string; body: string };
+
 const AUTO_SYNC_PRIORITY: readonly SyncProvider[] = ["gmail", "outlook", "linkedin"];
 const EMAIL_PROVIDERS: readonly SyncProvider[] = ["gmail", "outlook"];
 const AUTO_SYNC_INTERVAL_MS = 10 * 60_000;
@@ -30,6 +33,8 @@ export default function NovaPulse() {
   const [checking, setChecking] = useState(false);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [references, setReferences] = useState<ChatReference[]>([]);
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [lastChecked, setLastChecked] = useState<number | null>(null);
   const automaticSyncInFlight = useRef(false);
 
@@ -142,11 +147,37 @@ export default function NovaPulse() {
     setChecking(false);
   }
 
-  function ask(event: FormEvent) {
+  async function ask(event: FormEvent) {
     event.preventDefault();
     if (!data || !question.trim()) return;
-    setAnswer(answerPulse(question, data));
+    const prompt = question;
     setQuestion("");
+    setChecking(true);
+    setAnswer("Reviewing your connected workspace…");
+    try {
+      const response = await fetch("/api/nova/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ message: prompt, page: window.location.pathname }) });
+      const payload = await response.json() as { text?: string; references?: ChatReference[]; error?: string };
+      if (!response.ok) throw new Error(payload.error || "NOVA could not answer that.");
+      setAnswer(payload.text || answerPulse(prompt, data));
+      setReferences(payload.references ?? []);
+    } catch (error) {
+      setAnswer(error instanceof Error ? error.message : answerPulse(prompt, data));
+      setReferences([]);
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function createDraft(reference: ChatReference) {
+    setChecking(true);
+    try {
+      const response = await fetch("/api/nova/draft", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ senderName: reference.title, subject: reference.title, body: reference.summary, tone: "professional" }) });
+      const payload = await response.json() as Draft & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "Draft unavailable.");
+      setDraft(payload);
+      setAnswer("I prepared a draft. Review and edit it below—nothing has been sent.");
+    } catch (error) { setAnswer(error instanceof Error ? error.message : "Draft unavailable."); }
+    finally { setChecking(false); }
   }
 
   if (!open) {
@@ -175,6 +206,11 @@ export default function NovaPulse() {
           <p>{item.body}</p>
         </article>)}
         {answer && <div className="nova-pulse-bubble assistant"><span>NOVA</span><p>{answer}</p></div>}
+        {references.map((item) => <article className={`nova-reference ${item.priority}`} key={item.id}>
+          <div><span>{item.source}</span><b>{item.priority}</b></div><strong>{item.title}</strong><p>{item.summary}</p><small>{item.why}</small>
+          <footer>{item.canonicalUrl ? <a href={item.canonicalUrl} target="_blank" rel="noreferrer">View</a> : null}{item.requiresResponse ? <button onClick={() => void createDraft(item)}>Draft reply</button> : null}</footer>
+        </article>)}
+        {draft ? <article className="nova-draft"><header><span>DRAFT · {draft.tone}</span><b>Not sent</b></header><input aria-label="Draft subject" value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}/><textarea aria-label="Draft response" value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })}/><footer><button onClick={() => setDraft(null)}>Cancel</button><button onClick={() => setAnswer("Sending requires a connected write-capable account and a separate confirmation. Nothing was sent.")}>Review send</button></footer></article> : null}
       </>}
     </div>
 
@@ -187,7 +223,7 @@ export default function NovaPulse() {
         <label htmlFor="nova-pulse-question">Ask about your updates</label>
         <div><input id="nova-pulse-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What changed?" /><button disabled={!data || !question.trim()} aria-label="Ask NOVA">↑</button></div>
       </form>
-      <footer>Auto-checks on login + every 10 minutes · 0 model calls</footer>
+      <footer>Grounded in connected sources · external actions require confirmation</footer>
     </>}
   </aside>;
 }

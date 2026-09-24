@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 type Provider = "gmail" | "outlook" | "linkedin";
 
@@ -83,7 +84,10 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const initialLoad = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(initialLoad);
+  }, [load]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -178,7 +182,7 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
 
   return <main className="library-shell">
     <header className="library-topbar">
-      <a href="/" className="library-brand">NOVA <span>knowledge workspace</span></a>
+      <Link href="/" className="library-brand">NOVA <span>knowledge workspace</span></Link>
       <div className="library-user"><span>{user.displayName}</span><small>{user.email}</small></div>
       <a href="/signout-with-chatgpt?return_to=%2F" target="_top" className="library-signout">Sign out</a>
     </header>

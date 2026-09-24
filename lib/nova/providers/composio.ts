@@ -6,6 +6,7 @@ type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respons
 export interface ComposioClientOptions {
   apiKey: string;
   readToolAllowlist: readonly string[];
+  writeToolAllowlist?: readonly string[];
   baseUrl?: string;
   fetcher?: Fetcher;
 }
@@ -32,6 +33,10 @@ export interface ExecuteReadToolInput {
   arguments?: Record<string, unknown>;
 }
 
+export interface ExecuteActionToolInput extends ExecuteReadToolInput {
+  confirmed: boolean;
+}
+
 export interface ComposioToolResult {
   data?: unknown;
   error?: string | null;
@@ -52,6 +57,7 @@ export class ComposioReadOnlyClient {
   private readonly baseUrl: string;
   private readonly fetcher: Fetcher;
   private readonly readToolAllowlist: ReadonlySet<string>;
+  private readonly writeToolAllowlist: ReadonlySet<string>;
 
   constructor(options: ComposioClientOptions) {
     if (!options.apiKey.trim()) throw new Error("COMPOSIO_API_KEY is required on the server.");
@@ -60,6 +66,7 @@ export class ComposioReadOnlyClient {
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
     this.fetcher = options.fetcher ?? fetch;
     this.readToolAllowlist = new Set(options.readToolAllowlist.map((slug) => slug.toUpperCase()));
+    this.writeToolAllowlist = new Set((options.writeToolAllowlist ?? []).map((slug) => slug.toUpperCase()));
   }
 
   createAuthLink(input: CreateAuthLinkInput) {
@@ -91,6 +98,17 @@ export class ComposioReadOnlyClient {
         version: input.version,
         arguments: input.arguments ?? {},
       }),
+    });
+  }
+
+  executeActionTool(input: ExecuteActionToolInput) {
+    const toolSlug = input.toolSlug.toUpperCase();
+    if (!input.confirmed) throw new Error("Explicit confirmation is required before external execution.");
+    if (!this.writeToolAllowlist.has(toolSlug)) throw new Error(`Composio tool ${toolSlug} is not in NOVA's reviewed write allowlist.`);
+    if (!/^\d{8}_\d{2}$/.test(input.version)) throw new Error("Pin a dated Composio tool version before execution.");
+    return this.request<ComposioToolResult>(`/tools/execute/${encodeURIComponent(toolSlug)}`, {
+      method: "POST",
+      body: JSON.stringify({ connected_account_id: requireOpaqueId(input.connectedAccountId, "connected account ID"), user_id: requireOpaqueId(input.userId, "user ID"), version: input.version, arguments: input.arguments ?? {} }),
     });
   }
 

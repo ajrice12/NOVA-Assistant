@@ -13,6 +13,9 @@ import { answerPulse, buildPulseReport } from "../lib/nova/pulse.ts";
 import { ComposioReadOnlyClient, verifyComposioWebhook } from "../lib/nova/providers/composio.ts";
 import { processNovaContext } from "../lib/nova/runtime.ts";
 import { summarizeWithoutModel } from "../lib/nova/summarize.ts";
+import { createActionProposal, resolveSendReference } from "../lib/nova-ai/action-planner.ts";
+import { analyzeMessage } from "../lib/nova-ai/message-intelligence.ts";
+import { authorizeProposal, requiresConfirmation } from "../lib/nova-ai/tool-policy.ts";
 
 const now = new Date("2026-08-20T12:00:00.000Z");
 
@@ -199,4 +202,31 @@ test("Composio webhook verification rejects replays and accepts a valid signatur
 
   assert.equal(await verifyComposioWebhook(headers, body, secret, now), true);
   assert.equal(await verifyComposioWebhook(headers, body, secret, new Date(now.getTime() + 301_000)), false);
+});
+
+test("message intelligence combines deterministic signals into an explainable priority", () => {
+  const intelligence = analyzeMessage({ id: "m1", externalId: "m1", source: "gmail", sender: { name: "Recruiter" }, subject: "Interview availability", preview: "Are you available Friday? Please reply today.", timestamp: now.toISOString(), unread: true }, now);
+  assert.equal(intelligence.category, "recruiting");
+  assert.equal(intelligence.requiresResponse, true);
+  assert.ok(intelligence.priorityScore >= 70);
+});
+
+test("drafting never authorizes a send", () => {
+  assert.equal(requiresConfirmation("DRAFT_REPLY"), false);
+  assert.equal(requiresConfirmation("SEND_REPLY"), true);
+  const proposal = createActionProposal({ intent: "SEND_REPLY", accountId: "account-1", targetId: "thread-1", summary: "Send reviewed reply" });
+  assert.equal(authorizeProposal(proposal, { userId: "user-1", accountUserId: "user-1" }).allowed, false);
+});
+
+test("send it cannot resolve without one identified pending draft", () => {
+  assert.equal(resolveSendReference(undefined), null);
+  const archive = createActionProposal({ intent: "ARCHIVE_MESSAGE", accountId: "account-1", targetId: "message-1", summary: "Archive" });
+  assert.equal(resolveSendReference(archive), null);
+});
+
+test("confirmation is exact and account scoped", () => {
+  const proposal = createActionProposal({ intent: "SEND_REPLY", accountId: "account-1", targetId: "thread-1", summary: "Send reviewed reply" });
+  assert.equal(authorizeProposal(proposal, { userId: "user-1", accountUserId: "user-2", confirmedProposalId: proposal.id }).allowed, false);
+  assert.equal(authorizeProposal(proposal, { userId: "user-1", accountUserId: "user-1", confirmedProposalId: "another-action" }).allowed, false);
+  assert.equal(authorizeProposal(proposal, { userId: "user-1", accountUserId: "user-1", confirmedProposalId: proposal.id }).allowed, true);
 });

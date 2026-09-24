@@ -465,6 +465,18 @@ button { cursor: pointer; }
 .nova-pulse-report > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .nova-pulse-report strong { display: block; margin-top: 7px; font-family: Georgia, serif; font-size: 15px; font-weight: 400; }
 .nova-pulse-report p { margin: 6px 0 0; color: #5d6158; font-size: 11px; line-height: 1.45; }
+.nova-reference { padding: 13px; border: 1px solid var(--line); border-left: 3px solid #7b8076; background: var(--white); }
+.nova-reference.high, .nova-reference.critical { border-left-color: #b34a35; }
+.nova-reference > div, .nova-draft header { display: flex; align-items: center; justify-content: space-between; font-size: 8px; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+.nova-reference > div span { color: var(--muted); }.nova-reference > div b { color: #9c3f2f; }
+.nova-reference > strong { display: block; margin: 8px 0 4px; font-family: Georgia, serif; font-size: 15px; font-weight: 400; }
+.nova-reference p { margin: 0; font-size: 11px; line-height: 1.45; }.nova-reference small { display: block; margin-top: 7px; color: var(--muted); font-size: 9px; }
+.nova-reference footer, .nova-draft footer { display: flex; justify-content: flex-end; gap: 7px; margin-top: 11px; }
+.nova-reference footer a, .nova-reference footer button, .nova-draft footer button { min-height: 29px; padding: 0 10px; border: 1px solid var(--ink); background: transparent; color: var(--ink); font-size: 9px; font-weight: 900; }
+.nova-reference footer button, .nova-draft footer button:last-child { background: var(--acid); }
+.nova-draft { padding: 13px; border: 1px solid var(--ink); background: #f7f6ef; }.nova-draft header b { color: #9c3f2f; }
+.nova-draft input, .nova-draft textarea { width: 100%; margin-top: 9px; border: 1px solid var(--line); background: var(--white); color: var(--ink); font: inherit; }
+.nova-draft input { height: 34px; padding: 0 9px; }.nova-draft textarea { min-height: 145px; padding: 9px; resize: vertical; line-height: 1.5; }
 .nova-pulse-actions { padding: 10px 13px; display: flex; gap: 8px; border-top: 1px solid var(--line); background: var(--white); }
 .nova-pulse-actions button { flex: 1; min-height: 34px; border: 1px solid var(--ink); background: transparent; color: var(--ink); font-size: 9px; font-weight: 900; }
 .nova-pulse-actions button:first-child { background: var(--acid); }
