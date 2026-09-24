@@ -9,6 +9,7 @@ import { Chat } from "../components/atlas/chat";
 import { Inbox, SourceRow } from "../components/atlas/inbox";
 import { Dialog } from "../components/atlas/dialog";
 import { DraftDialog, type DraftData } from "../components/atlas/draft-dialog";
+import { AtlasCompanion, type AtlasSurface } from "../components/atlas/atlas-companion";
 import { api, useWorkspace } from "../components/atlas/use-workspace";
 import { buildBriefing, relativeTime, type ChatTurn, type Provider, type Source, type WorkspaceView, type Reference } from "@/lib/atlas/workspace";
 import { parseSourceTitle } from "@/lib/nova-ai/source-title";
@@ -26,6 +27,8 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
   const [palette, setPalette] = useState(false);
   const [command, setCommand] = useState("");
   const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [surface, setSurface] = useState<AtlasSurface>("workspace");
+  const [sessionReady, setSessionReady] = useState(false);
   const [chatBusy, setChatBusy] = useState(false);
   const [chatStatus, setChatStatus] = useState("");
   const [draft, setDraft] = useState<DraftData | null>(null);
@@ -51,6 +54,13 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
       const hash = window.location.hash.slice(1) as WorkspaceView;
       if ([...NAV.map(n => n.id), "apps", "settings"].includes(hash)) setView(hash);
       try { const saved = localStorage.getItem("atlas:theme"); if (saved === "light" || saved === "dark") setTheme(saved); } catch { /* Optional preference. */ }
+      try {
+        const savedSurface = localStorage.getItem("atlas:surface"); if (savedSurface === "edge" || savedSurface === "brief" || savedSurface === "workspace") setSurface(savedSurface);
+        const savedSession = JSON.parse(sessionStorage.getItem("atlas:session") ?? "{}") as { turns?: ChatTurn[]; selectedId?: string | null };
+        if (Array.isArray(savedSession.turns)) setTurns(savedSession.turns.slice(-24));
+        if (typeof savedSession.selectedId === "string") setSelectedId(savedSession.selectedId);
+      } catch { /* Optional continuity. */ }
+      setSessionReady(true);
       setThemeReady(true);
       const hour = new Date().getHours(); setGreeting(hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening");
     }, 0);
@@ -59,13 +69,14 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
     return () => { window.clearTimeout(timer); document.removeEventListener("keydown", keydown); abortChat.current?.abort(); };
   }, []);
   useEffect(() => { if (!themeReady) return; document.documentElement.dataset.atlasTheme = theme; try { localStorage.setItem("atlas:theme", theme); } catch { /* Optional preference. */ } }, [theme, themeReady]);
+  useEffect(() => { if (!sessionReady) return; try { localStorage.setItem("atlas:surface", surface); sessionStorage.setItem("atlas:session", JSON.stringify({ turns: turns.slice(-24), selectedId })); } catch { /* Optional continuity. */ } }, [surface, turns, selectedId, sessionReady]);
   function openSource(id: string) { const source = sources.find(s => s.id === id); if (!source) { ws.setNotice("That source is no longer in this workspace. Refresh and try again."); return; } if (["email", "message"].includes(source.sourceType)) { setSelectedId(id); navigate("inbox"); } else { setKnowledgeSource(source); navigate("knowledge"); } }
   async function ask(text: string, sourceId?: string) {
     if (!user) { ws.setNotice("Sign in to ask Atlas about your connected workspace."); return; }
     if (chatInFlight.current) return;
     chatInFlight.current = true;
     const id = crypto.randomUUID();
-    const contextId = sourceId ?? (view === "chat" ? selectedId : undefined);
+    const contextId = sourceId ?? (surface !== "workspace" || view === "chat" ? selectedId : undefined);
     if (sourceId) setSelectedId(sourceId);
     const history = turns.slice(-12).map(t => ({ role: t.role, content: t.text, referencedMessageIds: t.references?.map(r => r.id) }));
     setTurns(current => [...current, { id: crypto.randomUUID(), role: "user", text }, { id, role: "assistant", text: "" }]);
@@ -89,9 +100,9 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
     } catch (error) { setTurns(current => current.map(t => t.id === id ? { ...t, text: t.text || (controller.signal.aborted ? "Response stopped." : error instanceof Error ? error.message : "Atlas is temporarily unavailable. Try again.") } : t)); }
     finally { setChatBusy(false); chatInFlight.current = false; abortChat.current = null; }
   }
-  async function connect(provider: Provider) {
+  async function connect(provider: Provider, displayName?: string) {
     setBusyProvider(provider);
-    try { const result = await api<{ redirectUrl: string }>("/api/nova/connect", { provider }); const url = new URL(result.redirectUrl); if (url.protocol !== "https:") throw new Error("A secure sign-in URL was not returned."); window.location.assign(url.href); }
+    try { const result = await api<{ redirectUrl: string }>("/api/nova/connect", { provider, displayName }); const url = new URL(result.redirectUrl); if (url.protocol !== "https:") throw new Error("A secure sign-in URL was not returned."); window.location.assign(url.href); }
     catch (e) { ws.setNotice(e instanceof Error ? e.message : "Connection unavailable."); } finally { setBusyProvider(null); }
   }
   async function createDraft(source: Source) {
@@ -120,7 +131,7 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
     catch (e) { ws.setNotice(e instanceof Error ? e.message : "Could not save your note."); } finally { setActionBusy(false); }
   }
   const navLabel = view === "apps" ? "Connected apps" : view === "settings" ? "Settings" : NAV.find(n => n.id === view)?.label;
-  return <main className="atlas-shell">
+  return <main className={`atlas-shell surface-${surface}`}>
     <a className="skip-link" href="#atlas-main">Skip to workspace</a><div className="ambient-background" aria-hidden="true" />
     <aside className={`atlas-sidebar${mobileNav ? " is-open" : ""}`}><button className="atlas-brand" onClick={() => navigate("home")} aria-label="Atlas home"><AtlasMark size={38} /><span>Atlas<small>Your intelligent workspace</small></span></button>
       <button className="sidebar-search" onClick={() => setPalette(true)}><Icon name="search" size={16} /><span>Ask or search</span><kbd>⌘ K</kbd></button>
@@ -140,7 +151,7 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
         </section>
         : view === "inbox" ? <Inbox sources={sources} selectedId={selectedId} onSelect={setSelectedId} onAsk={(t, id) => void ask(t, id)} onDraft={s => void createDraft(s)} onTrash={s => void prepareTrash(s)} onRemove={s => setPending({ kind: "remove", source: s })} busy={chatBusy || actionBusy} />
         : view === "chat" ? <Chat turns={turns} busy={chatBusy} status={chatStatus} onSend={text => void ask(text)} onStop={() => abortChat.current?.abort()} onOpen={openSource} onNew={() => { setTurns([]); setSelectedId(null); }} context={selected?.title} />
-        : view === "apps" ? <ConnectedApps connections={ws.connections} restoring={ws.restoring} syncing={ws.syncing} errors={ws.connectionErrors} onConnect={p => void connect(p)} onSync={p => void ws.sync([p])} busy={busyProvider} />
+        : view === "apps" ? <ConnectedApps connections={ws.connections} restoring={ws.restoring} syncing={ws.syncing} errors={ws.connectionErrors} onConnect={(p, name) => void connect(p, name)} onSync={p => void ws.sync([p])} busy={busyProvider} />
         : view === "knowledge" ? <section className="standard-page"><p className="eyebrow">Keep the useful things close</p><div className="section-heading"><h1>Your knowledge</h1><button className="primary" onClick={() => setCapture(true)}><Icon name="plus" size={17} />Save a note</button></div><p className="page-intro">Notes, documents, and context you can come back to.</p><label className="inbox-search"><Icon name="search" size={17} /><input placeholder="Search saved knowledge" aria-label="Search saved knowledge" value={knowledgeQuery} onChange={e => setKnowledgeQuery(e.target.value)} /></label><div className="knowledge-list">{sources.filter(s => !["email", "message"].includes(s.sourceType) && `${s.title} ${s.content}`.toLowerCase().includes(knowledgeQuery.toLowerCase())).map(source => <SourceRow key={source.id} source={source} onOpen={() => setKnowledgeSource(source)} />)}</div>{!sources.some(s => !["email", "message"].includes(s.sourceType)) && <div className="empty-state"><Icon name="knowledge" size={36} /><h2>A place for what you learn.</h2><p>Save your first note. Atlas keeps a searchable summary alongside the original.</p></div>}</section>
         : view === "calendar" ? <section className="standard-page"><p className="eyebrow">Make room for what matters</p><h1>Your calendar</h1><p className="page-intro">Meeting context, without guessing your availability.</p><div className="empty-state"><Icon name="calendar" size={44} /><h2>Calendar sync isn’t configured yet.</h2><p>Atlas can help find scheduling requests in your messages. It won’t claim you’re free without calendar data.</p><button className="secondary" onClick={() => void ask("Find scheduling and meeting requests")}>Review scheduling messages<Icon name="arrow" size={16} /></button></div><a className="text-button" href="/overview">Open regional context and existing overview<Icon name="external" size={16} /></a></section>
         : view === "activity" ? <section className="standard-page"><p className="eyebrow">A little transparency</p><h1>While you work</h1><p className="page-intro">Connection syncs and actions from this session.</p><div className="activity-list">{ws.activity.map(item => <article key={item.id}><Icon name={item.kind === "success" ? "check" : "activity"} size={18} /><p>{item.text}</p><time>{relativeTime(item.at)}</time></article>)}{!ws.activity.length && <div className="empty-state"><AtlasMark size={48} /><h2>Nothing to report yet.</h2><p>When Atlas syncs an app or completes an action, you’ll see it here.</p></div>}</div></section>
@@ -148,7 +159,8 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
       </div>
       {user && !["chat", "home", "inbox"].includes(view) && <div className="floating-ask"><button onClick={() => navigate("chat")}><AtlasMark size={24} /><span>Ask Atlas about your workspace</span><Icon name="arrow" size={16} /></button></div>}
     </div>
-    {user && <button className="compose-shortcut" title="Compose Gmail email" aria-label="Compose Gmail email" onClick={() => setDraft({ recipient: "", subject: "", body: "", sourceId: "compose" })}><Icon name="plus" size={22} /></button>}
+    {user && surface === "workspace" && <button className="compose-shortcut" title="Compose Gmail email" aria-label="Compose Gmail email" onClick={() => setDraft({ recipient: "", subject: "", body: "", sourceId: "compose" })}><Icon name="plus" size={22} /></button>}
+    {user && <AtlasCompanion surface={surface} onSurface={setSurface} sources={sources} connections={ws.connections} turns={turns} busy={chatBusy} status={chatStatus} onAsk={(text, id) => void ask(text, id)} onOpen={source => { setSurface("workspace"); openSource(source.id); }} onDraft={source => void createDraft(source)} onApps={() => { setSurface("workspace"); navigate("apps"); }} />}
     {palette && <Dialog title="Ask Atlas or run a command" onClose={() => setPalette(false)} className="command-palette"><form onSubmit={e => { e.preventDefault(); setPalette(false); void ask(command); setCommand(""); }}><label className="command-input"><Icon name="search" /><input value={command} onChange={e => setCommand(e.target.value)} placeholder="Ask Atlas or run a command…" aria-label="Command or question" /></label>{command.trim() && <button className="command-item" type="submit"><AtlasMark size={22} />Ask Atlas: {command}<Icon name="arrow" size={16} /></button>}</form><div className="command-list">{[...NAV, { id: "apps" as const, label: "Connected apps" }, { id: "settings" as const, label: "Settings" }].filter(item => item.label.toLowerCase().includes(command.toLowerCase())).map(item => <button className="command-item" key={item.id} onClick={() => { navigate(item.id); setCommand(""); }}><Icon name={item.id} />Open {item.label}<Icon name="arrow" size={16} /></button>)}</div></Dialog>}
     {draft && <DraftDialog initial={draft} accountId={gmail?.id} onClose={() => setDraft(null)} onDone={message => { ws.setNotice(message); ws.addActivity(message, "success"); }} />}
     {pending && <Dialog title={pending.kind === "trash" ? "Move this email to Gmail Trash?" : "Remove the saved copy?"} onClose={() => { if (!actionBusy) setPending(null); }}><p className="dialog-intro">{pending.source?.title}</p><p>{pending.kind === "trash" ? "This changes the actual email in Gmail. You can recover it from Gmail Trash." : "The original stays in its app. Atlas may import it again on the next sync."}</p><footer><button className="secondary" disabled={actionBusy} onClick={() => setPending(null)}>Cancel</button><button className="primary" disabled={actionBusy} onClick={() => void executePending()}>{actionBusy ? "Working…" : pending.kind === "trash" ? "Confirm move" : "Remove from Atlas"}</button></footer></Dialog>}

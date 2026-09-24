@@ -2,7 +2,7 @@ import { analyzeMessage } from "../nova-ai/message-intelligence.ts";
 import type { MessageIntelligence } from "../nova-ai/types.ts";
 import { parseSourceTitle } from "../nova-ai/source-title.ts";
 
-export type Provider = "gmail" | "outlook" | "linkedin";
+export type Provider = string;
 export type ConnectionStatus = "connecting" | "connected" | "syncing" | "attention" | "disconnected" | "error";
 export type WorkspaceView = "home" | "inbox" | "chat" | "calendar" | "knowledge" | "activity" | "apps" | "settings";
 export interface Source {
@@ -48,7 +48,7 @@ export function buildBriefing(sources: Source[]) {
   const messages = sources.filter(s => s.sourceType === "email" || s.sourceType === "message");
   const ranked = messages.map(source => ({ source, intelligence: sourceIntelligence(source) }))
     .sort((a, b) => b.intelligence.priorityScore - a.intelligence.priorityScore || b.source.occurredAt - a.source.occurredAt);
-  const attention = ranked.filter(item => item.intelligence.requiresResponse || ["high", "critical"].includes(item.intelligence.priority));
+  const attention = ranked.filter(item => !item.intelligence.isAutomated && (item.intelligence.requiresResponse || ["high", "critical"].includes(item.intelligence.priority)));
   const replies = ranked.filter(item => item.intelligence.requiresResponse).length;
   const text = !messages.length ? "Your workspace is ready. Connect an account to see what deserves your attention."
     : attention.length ? `${attention.length === 1 ? "One message may need" : `${attention.length} messages may need`} your attention.${replies ? ` ${replies === 1 ? "One looks" : `${replies} look`} like ${replies === 1 ? "it needs a reply" : "they need replies"}.` : " Start with the items below."}`

@@ -74,3 +74,17 @@ export function getComposioGmailTrashConfig() {
 export function isSupportedCloudProvider(value: unknown): value is SupportedCloudProvider {
   return value === "gmail" || value === "outlook" || value === "linkedin";
 }
+
+export function getToolkitAuthConfig(provider: string) {
+  const values = runtimeEnv();
+  const normalized = provider.trim().toLowerCase();
+  if (!/^[a-z0-9_]{1,80}$/.test(normalized)) return "";
+  if (isSupportedCloudProvider(normalized)) return getComposioProviderConfig(normalized).authConfigId;
+  try {
+    const configured = JSON.parse(values.COMPOSIO_AUTH_CONFIGS_JSON ?? "{}") as Record<string, unknown>;
+    const value = configured[normalized];
+    return typeof value === "string" ? value.trim() : "";
+  } catch { return ""; }
+}
+
+export function getComposioApiKey() { return runtimeEnv().COMPOSIO_API_KEY?.trim() ?? ""; }

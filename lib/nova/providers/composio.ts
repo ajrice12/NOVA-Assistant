@@ -57,6 +57,11 @@ export interface ComposioConnectedAccountList {
   next_cursor?: string | null;
 }
 
+export interface ComposioToolkitList {
+  items: Array<{ slug: string; name: string; meta?: { description?: string; logo?: string; categories?: Array<{ name?: string; slug?: string }>; tools_count?: number; version?: string } }>;
+  next_cursor?: string | null;
+}
+
 function requireOpaqueId(value: string, label: string) {
   const normalized = value.trim();
   if (!normalized || normalized.length > 200 || !/^[a-zA-Z0-9_.:@-]+$/.test(normalized)) {
@@ -127,6 +132,13 @@ export class ComposioReadOnlyClient {
     return this.listAccountPages(query);
   }
 
+  listToolkits(query = "", limit = 40) {
+    const params = new URLSearchParams({ limit: String(Math.min(Math.max(limit, 1), 100)) });
+    if (query.trim()) params.set("search", query.trim().slice(0, 120));
+    const toolkitBase = this.baseUrl.replace(/\/v3\.1$/, "/v3");
+    return this.requestUrl<ComposioToolkitList>(`${toolkitBase}/toolkits?${params}`, { method: "GET" });
+  }
+
   private async listAccountPages(query: URLSearchParams): Promise<ComposioConnectedAccountList> {
     const items: ComposioConnectedAccount[] = [];
     const cursors = new Set<string>();
@@ -160,7 +172,11 @@ export class ComposioReadOnlyClient {
   }
 
   private async request<T>(path: string, init: RequestInit): Promise<T> {
-    const response = await this.fetcher(`${this.baseUrl}${path}`, {
+    return this.requestUrl<T>(`${this.baseUrl}${path}`, init);
+  }
+
+  private async requestUrl<T>(url: string, init: RequestInit): Promise<T> {
+    const response = await this.fetcher(url, {
       ...init,
       signal: init.signal ?? AbortSignal.timeout(25_000),
       headers: {

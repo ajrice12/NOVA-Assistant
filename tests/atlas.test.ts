@@ -7,6 +7,7 @@ import { answerFromContext } from "../lib/nova-ai/response-generator.ts";
 import { parseSourceTitle } from "../lib/nova-ai/source-title.ts";
 import { normalizeComposioResult } from "../lib/nova/normalize-composio.ts";
 import { ComposioReadOnlyClient, type ComposioConnectedAccount } from "../lib/nova/providers/composio.ts";
+import { inferCapabilities, rankApps, toolkitToCapability } from "../lib/atlas/apps.ts";
 const source: Source = { id: "one", externalId: "remote-one", title: "Interview — Amy <amy@example.com>", content: "Are you available Friday? Please reply with two times.", summary: "Please share availability for Friday.", provider: "gmail", sourceType: "email", accountLabel: "Gmail", occurredAt: Date.now(), updatedAt: Date.now(), labels: [], canonicalUrl: null, summaryStrategy: "extractive", modelCallCount: 0 };
 const account = (id: string, status: ComposioConnectedAccount["status"]): ComposioConnectedAccount => ({ id, status, user_id: "u1", toolkit: { slug: "gmail" } });
 test("restoration preserves the selected mailbox even when another is active", () => {
@@ -29,6 +30,8 @@ test("briefing is based on actual messages and has an honest empty state", () =>
   assert.match(buildBriefing([]).text, /Connect an account/);
   assert.equal(buildBriefing([source]).replies, 1);
   assert.equal(buildBriefing([{ ...source, sourceType: "note" }]).replies, 0);
+  const promotion = { ...source, title: "40% off sitewide — Store <news@marketing.example>", content: "Limited-time deal. Manage preferences.", summary: "A promotional sale." };
+  assert.equal(buildBriefing([promotion]).attention.length, 0);
 });
 test("sender parsing uses the title suffix, not arbitrary body addresses", () => {
   assert.deepEqual(parseSourceTitle(source.title), { subject: "Interview", sender: "Amy", address: "amy@example.com" });
@@ -83,6 +86,18 @@ test("connection verification includes inactive accounts and paginates with iden
 test("failed discovery throws instead of reporting all accounts disconnected", async () => {
   const client = new ComposioReadOnlyClient({ apiKey: "test", readToolAllowlist: ["GMAIL_FETCH_EMAILS"], fetcher: async () => new Response("unavailable", { status: 503 }) });
   await assert.rejects(client.listConnectedAccounts("u1", true), /503/);
+});
+test("Composio toolkit metadata becomes a searchable capability registry", async () => {
+  const urls: string[] = [];
+  const client = new ComposioReadOnlyClient({ apiKey: "test", readToolAllowlist: ["SAFE_READ"], fetcher: async input => { urls.push(String(input)); return Response.json({ items: [{ slug: "github", name: "GitHub", meta: { description: "Repositories and issues", tools_count: 12, categories: [{ name: "Developer Tools" }] } }] }); } });
+  const result = await client.listToolkits("github", 20);
+  assert.match(urls[0], /\/api\/v3\/toolkits/); assert.match(urls[0], /search=github/);
+  const app = toolkitToCapability(result.items[0], { connectable: true, tools: ["GITHUB_SEARCH_REPOSITORIES", "GITHUB_CREATE_ISSUE"] });
+  assert.equal(app.categories[0], "Developer"); assert.equal(app.searchable, true); assert.equal(app.supportsCreate, true); assert.equal(app.connectable, true);
+  assert.equal(rankApps([app, { ...app, provider: "notion", displayName: "Notion" }], "github")[0].provider, "github");
+});
+test("capability inference never claims unsupported write operations", () => {
+  assert.deepEqual(inferCapabilities(["DRIVE_SEARCH_FILES", "DRIVE_GET_FILE"]), { searchable: true, readable: true, writable: false, supportsReply: false, supportsSend: false, supportsCreate: false, supportsUpdate: false, supportsDelete: false });
 });
 
 test("Gmail MIME body is preferred to a short snippet and attachments stay out", () => {

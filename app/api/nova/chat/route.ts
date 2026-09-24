@@ -1,6 +1,6 @@
 import { getChatGPTUser } from "@/app/chatgpt-auth";
 import { workspaceToChatContext } from "@/lib/nova-ai/context-builder";
-import { answerFromContext } from "@/lib/nova-ai/response-generator";
+import { answerWithAtlas } from "@/lib/nova-ai/assistant";
 import { loadWorkspace } from "@/lib/nova/persistence";
 import { DEV_WORKSPACE } from "@/lib/nova/dev-workspace";
 import type { ChatContext } from "@/lib/nova-ai/types";
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     try { workspace = await loadWorkspace(user!); }
     catch (error) { if (user!.userId !== "local-development-user") throw error; workspace = DEV_WORKSPACE; }
     const context = workspaceToChatContext({ page: typeof body!.page === "string" ? body!.page : "/", sources: workspace.sources, connections: workspace.connections, selectedMessageId: typeof body!.selectedMessageId === "string" ? body!.selectedMessageId : undefined, conversation });
-    return answerFromContext(message, context);
+    return answerWithAtlas(message, context);
   }
   if (body.stream !== true) {
     try { return Response.json(await answer()); } catch { return Response.json({ error: "Your saved workspace is temporarily unavailable." }, { status: 503 }); }

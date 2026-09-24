@@ -20,7 +20,7 @@ export async function POST() {
     const result = user.userId === "local-development-user"
       ? await client.listAllConnectedAccounts(true)
       : await client.listConnectedAccounts(user.userId, true);
-    const discovered: Array<{ provider: SupportedCloudProvider; accountId: string }> = [];
+    const discovered: Array<{ provider: string; accountId: string }> = [];
     for (const provider of ["gmail", "linkedin", "outlook"] as const) {
       const existing = await getConnection(user.userId, provider);
       // Outlook remains opt-in while the known external issue is unresolved.
@@ -33,6 +33,14 @@ export async function POST() {
       } else if (existing) {
         await updateConnectionStatus(user.userId, provider, account ? restoredStatus(account.status) : "attention");
       }
+    }
+    const knownAccountIds = new Set(discovered.map(item => item.accountId));
+    for (const account of result.items) {
+      const provider = account.toolkit.slug.toLowerCase();
+      if (TOOLKIT_PROVIDER[provider] || account.status !== "ACTIVE" || knownAccountIds.has(account.id)) continue;
+      if (user.userId !== "local-development-user" && account.user_id !== user.userId) continue;
+      await saveDiscoveredConnection(user, provider, account.id, provider.replace(/_/g, " ").replace(/\b\w/g, letter => letter.toUpperCase()));
+      discovered.push({ provider, accountId: account.id });
     }
     return Response.json({ discovered });
   } catch (error) {
