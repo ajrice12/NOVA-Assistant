@@ -269,6 +269,32 @@ export async function savePendingConnection(
   ).run();
 }
 
+export async function saveDiscoveredConnection(
+  user: NovaUser,
+  provider: SupportedCloudProvider,
+  externalAccountId: string,
+) {
+  const now = Date.now();
+  const capabilities = provider === "linkedin" ? ["professional.read"] : ["email.read", "email.draft", "email.send"];
+  await ensureUser(user);
+  await getDatabase().prepare(`
+    INSERT INTO connector_accounts (
+      id, user_id, provider, label, external_account_id, status, permission_level,
+      granted_capabilities_json, connection_reference, last_sync_at, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, 'active', 'suggest', ?, ?, NULL, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      external_account_id = excluded.external_account_id,
+      status = 'active',
+      granted_capabilities_json = excluded.granted_capabilities_json,
+      connection_reference = excluded.connection_reference,
+      updated_at = excluded.updated_at
+  `).bind(
+    connectionId(user.userId, provider), user.userId, provider,
+    provider === "gmail" ? "Gmail" : provider === "outlook" ? "Outlook" : "LinkedIn",
+    externalAccountId, JSON.stringify(capabilities), externalAccountId, now, now,
+  ).run();
+}
+
 export async function getConnection(userId: string, provider: SupportedCloudProvider) {
   return getDatabase().prepare(`
     SELECT id, external_account_id, status

@@ -86,7 +86,9 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
   }, []);
 
   useEffect(() => {
-    const initialLoad = window.setTimeout(() => void load(), 0);
+    const initialLoad = window.setTimeout(() => {
+      void fetch("/api/nova/connections/discover", { method: "POST" }).finally(() => void load());
+    }, 0);
     return () => window.clearTimeout(initialLoad);
   }, [load]);
 

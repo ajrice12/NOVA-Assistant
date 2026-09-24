@@ -190,6 +190,22 @@ test("Composio client uses Connect Links and blocks unreviewed tools", async () 
   );
 });
 
+test("Composio discovery is scoped to the signed-in NOVA user", async () => {
+  let capturedUrl = "";
+  const client = new ComposioReadOnlyClient({
+    apiKey: "server-test-key",
+    readToolAllowlist: ["GMAIL_FETCH_EMAILS"],
+    fetcher: async (input) => {
+      capturedUrl = String(input);
+      return Response.json({ items: [{ id: "ca_1", user_id: "user-1", status: "ACTIVE", toolkit: { slug: "gmail" } }] });
+    },
+  });
+  const accounts = await client.listConnectedAccounts("user-1");
+  assert.equal(accounts.items[0].id, "ca_1");
+  assert.match(capturedUrl, /user_ids=user-1/);
+  assert.match(capturedUrl, /statuses=ACTIVE/);
+});
+
 test("Composio webhook verification rejects replays and accepts a valid signature", async () => {
   const timestamp = Math.floor(now.getTime() / 1000).toString();
   const webhookId = "msg_1";

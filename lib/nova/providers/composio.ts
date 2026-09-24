@@ -44,6 +44,19 @@ export interface ComposioToolResult {
   log_id?: string;
 }
 
+export interface ComposioConnectedAccount {
+  id: string;
+  user_id: string;
+  status: "INITIALIZING" | "INITIATED" | "ACTIVE" | "FAILED" | "EXPIRED" | "INACTIVE" | "REVOKED";
+  alias?: string | null;
+  toolkit: { slug: string };
+}
+
+export interface ComposioConnectedAccountList {
+  items: ComposioConnectedAccount[];
+  next_cursor?: string | null;
+}
+
 function requireOpaqueId(value: string, label: string) {
   const normalized = value.trim();
   if (!normalized || normalized.length > 200 || !/^[a-zA-Z0-9_.:@-]+$/.test(normalized)) {
@@ -99,6 +112,13 @@ export class ComposioReadOnlyClient {
         arguments: input.arguments ?? {},
       }),
     });
+  }
+
+  listConnectedAccounts(userId: string) {
+    const query = new URLSearchParams({ limit: "100" });
+    query.append("user_ids", requireOpaqueId(userId, "user ID"));
+    query.append("statuses", "ACTIVE");
+    return this.request<ComposioConnectedAccountList>(`/connected_accounts?${query.toString()}`, { method: "GET" });
   }
 
   executeActionTool(input: ExecuteActionToolInput) {
