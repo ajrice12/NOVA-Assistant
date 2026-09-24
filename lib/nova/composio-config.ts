@@ -62,6 +62,15 @@ export function getComposioGmailSendConfig() {
   };
 }
 
+export function getComposioGmailTrashConfig() {
+  const values = runtimeEnv();
+  return {
+    apiKey: values.COMPOSIO_API_KEY?.trim() ?? "",
+    toolSlug: values.COMPOSIO_GMAIL_TRASH_TOOL?.trim() || "GMAIL_MOVE_TO_TRASH",
+    toolVersion: values.COMPOSIO_GMAIL_TRASH_TOOL_VERSION?.trim() || "20260903_00",
+  };
+}
+
 export function isSupportedCloudProvider(value: unknown): value is SupportedCloudProvider {
   return value === "gmail" || value === "outlook" || value === "linkedin";
 }

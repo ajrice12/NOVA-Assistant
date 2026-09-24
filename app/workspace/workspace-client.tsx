@@ -7,6 +7,7 @@ type Provider = "gmail" | "outlook" | "linkedin";
 
 type Source = {
   id: string;
+  externalId: string;
   title: string;
   content: string;
   summary: string;
@@ -20,6 +21,8 @@ type Source = {
   summaryStrategy: string;
   modelCallCount: number;
 };
+
+type ActionProposal = { id: string; intent: "ARCHIVE_MESSAGE"; risk: string; accountId: string; targetId: string; summary: string; arguments: Record<string, unknown>; status: "proposed" };
 
 type Connection = {
   id: string;
@@ -68,6 +71,7 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
   const [sourceType, setSourceType] = useState("note");
   const [saving, setSaving] = useState(false);
   const [busyProvider, setBusyProvider] = useState<Provider | null>(null);
+  const [trashProposal, setTrashProposal] = useState<ActionProposal | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -165,14 +169,33 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
   }
 
   async function remove(source: Source) {
-    if (!window.confirm(`Delete “${source.title}” from NOVA?`)) return;
+    if (!window.confirm(`Remove “${source.title}” from NOVA only? It will remain in Gmail.`)) return;
     const response = await fetch(`/api/nova/workspace/${encodeURIComponent(source.id)}`, { method: "DELETE" });
     const payload = await response.json() as { error?: string };
     if (!response.ok) {
       setNotice(payload.error || "This item could not be deleted.");
       return;
     }
-    setNotice("Item deleted.");
+    setNotice("Item removed from NOVA. The original remains in Gmail.");
+    await load();
+  }
+
+  async function proposeTrash(source: Source) {
+    const gmail = data?.connections.find((connection) => connection.provider === "gmail" && connection.status === "active");
+    if (!gmail) { setNotice("Gmail is not connected."); return; }
+    const response = await fetch("/api/nova/actions/propose", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ intent: "ARCHIVE_MESSAGE", accountId: gmail.id, targetId: source.id, summary: `Move “${source.title}” to Gmail Trash`, arguments: { message_id: source.externalId } }) });
+    const payload = await response.json() as ActionProposal & { error?: string };
+    if (!response.ok) { setNotice(payload.error || "Could not prepare this Gmail action."); return; }
+    setTrashProposal(payload);
+  }
+
+  async function confirmTrash() {
+    if (!trashProposal) return;
+    const response = await fetch("/api/nova/actions/execute", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ proposal: trashProposal, confirmedProposalId: trashProposal.id }) });
+    const payload = await response.json() as { message?: string; error?: string };
+    if (!response.ok) { setNotice(payload.error || "Gmail did not move this message."); return; }
+    setNotice(payload.message || "Moved to Gmail Trash.");
+    setTrashProposal(null);
     await load();
   }
 
@@ -264,8 +287,9 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
         </div>
         <article className="knowledge-detail">
           {selected ? <>
-            <div className="knowledge-detail-top"><span>{selected.provider} / {selected.sourceType}</span><button onClick={() => remove(selected)}>Delete</button></div>
+            <div className="knowledge-detail-top"><span>{selected.provider} / {selected.sourceType}</span><div>{selected.provider === "gmail" ? <button onClick={() => void proposeTrash(selected)}>Move to Gmail Trash</button> : null}<button onClick={() => remove(selected)}>Remove from NOVA</button></div></div>
             <h2>{selected.title}</h2>
+            {trashProposal?.targetId === selected.id ? <div className="library-notice" role="alert"><span>!</span>Move this exact email to Gmail Trash? You can recover it from Gmail Trash.<button onClick={() => setTrashProposal(null)}>Cancel</button><button onClick={() => void confirmTrash()}>Confirm move</button></div> : null}
             <div className="knowledge-summary"><span>✦ NOVA SUMMARY</span><p>{selected.summary}</p></div>
             {selected.labels.length > 0 && <div className="knowledge-tags">{selected.labels.map((label) => <span key={label}>{label}</span>)}</div>}
             <div className="knowledge-content"><span>Saved source</span><p>{selected.content || "No source excerpt was stored for this item."}</p></div>

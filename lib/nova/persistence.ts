@@ -106,7 +106,7 @@ export async function loadWorkspace(user: NovaUser, query = "") {
   const like = `%${normalizedQuery.replace(/[\\%_]/g, "\\$&")}%`;
   const sourceSql = `
     SELECT
-      s.id, s.title, s.content, s.summary, s.source_type, s.canonical_url,
+      s.id, s.external_id, s.title, s.content, s.summary, s.source_type, s.canonical_url,
       s.labels_json, s.occurred_at, s.updated_at, s.summary_strategy,
       s.model_call_count, c.provider, c.label AS account_label
     FROM source_items s
@@ -134,6 +134,7 @@ export async function loadWorkspace(user: NovaUser, query = "") {
 
   const sources: WorkspaceSource[] = sourceResult.results.map((row) => ({
     id: String(row.id),
+    externalId: String(row.external_id),
     title: String(row.title),
     content: String(row.content ?? ""),
     summary: String(row.summary),
@@ -235,6 +236,15 @@ export async function deleteSource(userId: string, sourceId: string) {
   const result = await db.prepare("DELETE FROM source_items WHERE id = ? AND user_id = ?")
     .bind(sourceId, userId).run();
   return (result.meta.changes ?? 0) > 0;
+}
+
+export async function getSourceForAction(userId: string, sourceId: string) {
+  return getDatabase().prepare(`
+    SELECT s.id, s.external_id, s.connector_account_id, c.provider
+    FROM source_items s
+    JOIN connector_accounts c ON c.id = s.connector_account_id
+    WHERE s.id = ? AND s.user_id = ?
+  `).bind(sourceId, userId).first<{ id: string; external_id: string; connector_account_id: string; provider: string }>();
 }
 
 export async function savePendingConnection(
