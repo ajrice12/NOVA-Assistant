@@ -26,7 +26,7 @@ function formatReportTime(value: number | null) {
 }
 
 export default function NovaPulse() {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [data, setData] = useState<PulseData | null>(null);
   const [signedIn, setSignedIn] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -80,6 +80,7 @@ export default function NovaPulse() {
 
   useEffect(() => {
     if (!signedIn || !data || automaticSyncInFlight.current) return;
+    if (data.user.email.endsWith("@nova.dev")) return;
     const provider = AUTO_SYNC_PRIORITY.find((candidate) =>
       data.connections.some((connection) => connection.provider === candidate && connection.status === "active"),
     );
@@ -125,6 +126,10 @@ export default function NovaPulse() {
 
   async function checkEmail() {
     if (!data) return;
+    if (data.user.email.endsWith("@nova.dev")) {
+      setAnswer("Local demonstration data is already loaded. Connect a real account in the hosted NOVA workspace for live sync.");
+      return;
+    }
     const providers = EMAIL_PROVIDERS.filter((provider) =>
       data.connections.some((connection) => connection.provider === provider && connection.status === "active"),
     );
@@ -182,23 +187,24 @@ export default function NovaPulse() {
 
   if (!open) {
     return <button className="nova-pulse-launcher" onClick={() => setOpen(true)} aria-label="Open NOVA Pulse reports">
-      <span>✦</span><strong>NOVA</strong>{report?.badgeCount ? <b>{report.badgeCount}</b> : null}
+      <span>✦</span><strong>NOVA</strong><small>Open assistant</small>{report?.badgeCount ? <b>{report.badgeCount}</b> : null}
     </button>;
   }
 
-  return <aside className="nova-pulse" aria-label="NOVA Pulse reports">
+  return <aside className="nova-pulse" aria-label="NOVA AI side panel">
     <header className="nova-pulse-head">
-      <div><span>✦</span><strong>NOVA PULSE</strong><small>{lastChecked ? "Live" : "Starting"}</small></div>
-      <button onClick={() => setOpen(false)} aria-label="Minimize NOVA Pulse">—</button>
+      <div><span>✦</span><strong>NOVA</strong><small>{lastChecked ? "Connected" : "Activating"}</small></div>
+      <button onClick={() => setOpen(false)} aria-label="Dock NOVA to the screen edge">›</button>
     </header>
+    <nav className="nova-pulse-tabs" aria-label="NOVA views"><button className="active">Assistant</button><button onClick={() => setAnswer("Your priority brief is shown below.")}>Brief</button><a href="/workspace">Workspace</a></nav>
 
     <div className="nova-pulse-feed" aria-live="polite">
       {!signedIn ? <div className="nova-pulse-bubble assistant">
         <span>NOVA</span><p>Sign in to see private reports from your connected accounts.</p>
         <a href="/signin-with-chatgpt?return_to=%2Fworkspace" target="_top">Sign in →</a>
       </div> : loading && !data ? <div className="nova-pulse-bubble assistant"><span>NOVA</span><p>Checking your latest information…</p></div> : <>
-        <div className="nova-pulse-bubble assistant">
-          <span>NOVA</span><p>{data?.user.displayName ? `${data.user.displayName}, ${report?.headline?.toLowerCase()}` : report?.headline}</p>
+        <div className="nova-pulse-bubble assistant hero">
+          <span>READY WHEN YOU ARE</span><p>{data?.user.displayName ? `${data.user.displayName}, ${report?.headline?.toLowerCase()}` : report?.headline}</p>
         </div>
         {report?.items.map((item) => <article className={`nova-pulse-report ${item.tone}`} key={item.id}>
           <div><span>{item.provider}</span><time>{formatReportTime(item.updatedAt)}</time></div>
@@ -215,6 +221,7 @@ export default function NovaPulse() {
     </div>
 
     {signedIn && <>
+      <div className="nova-suggestions"><button onClick={() => setQuestion("What needs my attention?")}>What needs attention?</button><button onClick={() => setQuestion("Show messages waiting on me")}>Waiting on me</button><button onClick={() => setQuestion("Summarize recruiting messages")}>Recruiting</button></div>
       <div className="nova-pulse-actions">
         <button onClick={() => void checkEmail()} disabled={checking || !data}>{checking ? "Checking…" : "Check email"}</button>
         <button onClick={() => void load()} disabled={loading}>Refresh reports</button>

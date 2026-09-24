@@ -444,21 +444,28 @@ button { cursor: pointer; }
 }
 
 /* NOVA Pulse */
-.nova-pulse-launcher { position: fixed; right: 22px; bottom: 86px; z-index: 48; min-height: 48px; padding: 0 15px; display: flex; align-items: center; gap: 8px; border: 1px solid #41463b; background: var(--ink); color: var(--white); box-shadow: 0 16px 40px rgba(0,0,0,.28); }
-.nova-pulse-launcher > span { color: var(--acid); font-size: 15px; }
-.nova-pulse-launcher strong { font-size: 10px; letter-spacing: .13em; }
+.nova-pulse-launcher { position: fixed; right: 0; top: 42%; z-index: 48; min-height: 138px; width: 54px; padding: 13px 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border: 1px solid rgba(255,255,255,.16); border-right: 0; border-radius: 18px 0 0 18px; background: linear-gradient(160deg,#242821,#11130f); color: var(--white); box-shadow: 0 18px 48px rgba(0,0,0,.34); }
+.nova-pulse-launcher > span { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 50%; background: var(--acid); color: var(--ink); font-size: 15px; box-shadow: 0 0 0 6px rgba(216,242,106,.08); }
+.nova-pulse-launcher strong { font-size: 9px; letter-spacing: .13em; writing-mode: vertical-rl; transform: rotate(180deg); }
+.nova-pulse-launcher small { position: absolute; right: 65px; width: max-content; padding: 7px 9px; border-radius: 7px; background: var(--ink); color: var(--white); opacity: 0; transform: translateX(6px); pointer-events: none; transition: .2s ease; font-size: 9px; }
+.nova-pulse-launcher:hover small { opacity: 1; transform: translateX(0); }
 .nova-pulse-launcher b { min-width: 20px; height: 20px; padding: 0 5px; display: grid; place-items: center; border-radius: 50%; background: var(--acid); color: var(--ink); font-size: 9px; }
-.nova-pulse { position: fixed; right: 22px; bottom: 86px; z-index: 48; width: min(370px, calc(100vw - 32px)); max-height: min(660px, calc(100vh - 110px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #41463b; background: var(--white); color: var(--ink); box-shadow: 0 24px 70px rgba(0,0,0,.32); }
-.nova-pulse-head { min-height: 54px; padding: 0 14px 0 17px; display: flex; align-items: center; justify-content: space-between; background: var(--ink); color: var(--white); }
+.nova-pulse { position: fixed; inset: 12px 12px 12px auto; z-index: 48; width: min(430px, calc(100vw - 24px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,255,255,.14); border-radius: 22px; background: rgba(248,248,243,.98); color: var(--ink); box-shadow: 0 30px 100px rgba(0,0,0,.38); backdrop-filter: blur(28px); animation: novaDockIn .28s cubic-bezier(.2,.8,.2,1); }
+.nova-pulse-head { min-height: 65px; padding: 0 14px 0 19px; display: flex; align-items: center; justify-content: space-between; background: linear-gradient(135deg,#151713,#252a21); color: var(--white); }
 .nova-pulse-head > div { display: flex; align-items: center; gap: 8px; }
 .nova-pulse-head span { color: var(--acid); }
 .nova-pulse-head strong { font-size: 10px; letter-spacing: .14em; }
 .nova-pulse-head small { padding-left: 8px; border-left: 1px solid #50554a; color: #a8ada1; font-size: 9px; }
-.nova-pulse-head > button { width: 32px; height: 32px; border: 1px solid #454a40; background: transparent; color: var(--white); font-size: 16px; }
-.nova-pulse-feed { min-height: 180px; max-height: 370px; padding: 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; background: var(--paper); }
+.nova-pulse-head > button { width: 36px; height: 36px; border: 1px solid #454a40; border-radius: 50%; background: rgba(255,255,255,.04); color: var(--white); font-size: 22px; }
+.nova-pulse-tabs { min-height: 45px; padding: 0 15px; display: flex; align-items: stretch; gap: 18px; border-bottom: 1px solid var(--line); background: var(--white); }
+.nova-pulse-tabs button, .nova-pulse-tabs a { display: grid; place-items: center; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); text-decoration: none; font-size: 10px; font-weight: 800; }
+.nova-pulse-tabs .active { border-bottom-color: var(--ink); color: var(--ink); }
+.nova-pulse-feed { min-height: 220px; flex: 1; padding: 18px; display: flex; flex-direction: column; gap: 11px; overflow-y: auto; background: radial-gradient(circle at 100% 0,rgba(216,242,106,.16),transparent 30%),var(--paper); }
 .nova-pulse-bubble { max-width: 91%; padding: 12px 14px; background: var(--ink); color: var(--white); align-self: flex-start; }
 .nova-pulse-bubble span { color: var(--acid); font-size: 8px; font-weight: 900; letter-spacing: .13em; }
 .nova-pulse-bubble p { margin: 7px 0 0; font-family: Georgia, serif; font-size: 14px; line-height: 1.45; }
+.nova-pulse-bubble.hero { max-width: 100%; padding: 18px; border-radius: 14px; background: linear-gradient(145deg,#181b16,#292e25); box-shadow: 0 12px 30px rgba(16,18,14,.14); }
+.nova-pulse-bubble.hero p { font-size: 17px; line-height: 1.42; }
 .nova-pulse-bubble a { display: inline-block; margin-top: 11px; color: var(--acid); font-size: 10px; font-weight: 900; }
 .nova-pulse-report { padding: 12px 13px; align-self: stretch; border: 1px solid var(--line); border-left: 3px solid var(--ink); background: var(--white); }
 .nova-pulse-report.attention { border-left-color: #b78328; background: #fff9e8; }
@@ -481,6 +488,8 @@ button { cursor: pointer; }
 .nova-pulse-actions button { flex: 1; min-height: 34px; border: 1px solid var(--ink); background: transparent; color: var(--ink); font-size: 9px; font-weight: 900; }
 .nova-pulse-actions button:first-child { background: var(--acid); }
 .nova-pulse-actions button:disabled { opacity: .45; }
+.nova-suggestions { padding: 11px 13px 3px; display: flex; gap: 6px; overflow-x: auto; background: var(--white); }
+.nova-suggestions button { flex: none; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: #f5f5ef; color: var(--ink); font-size: 9px; }
 .nova-pulse-form { padding: 0 13px 10px; background: var(--white); }
 .nova-pulse-form > label { display: block; margin: 2px 0 7px; color: var(--muted); font-size: 8px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
 .nova-pulse-form > div { min-height: 42px; display: flex; border: 1px solid var(--line); background: var(--paper); }
@@ -490,7 +499,15 @@ button { cursor: pointer; }
 .nova-pulse > footer { padding: 0 13px 11px; color: var(--muted); background: var(--white); font-size: 8px; text-align: right; }
 
 @media (max-width: 600px) {
-  .nova-pulse, .nova-pulse-launcher { right: 12px; bottom: 76px; }
-  .nova-pulse { width: calc(100vw - 24px); max-height: calc(100vh - 96px); }
-  .nova-pulse-feed { max-height: 46vh; }
+  .nova-pulse-launcher { right: 0; top: auto; bottom: 74px; }
+  .nova-pulse { inset: 8px; width: auto; border-radius: 18px; }
 }
+
+.local-signin { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 50% 35%,#2b3125 0,#151713 52%,#0c0d0b 100%); color: var(--white); }
+.local-signin-card { width: min(460px,100%); padding: 42px; border: 1px solid rgba(255,255,255,.16); border-radius: 26px; background: rgba(22,25,20,.88); box-shadow: 0 35px 100px rgba(0,0,0,.4); text-align: center; }
+.local-signin-card > span { color: var(--acid); font-size: 10px; font-weight: 900; letter-spacing: .16em; }
+.local-signin-card h1 { margin: 24px 0 10px; font-family: Georgia,serif; font-size: 38px; font-weight: 400; letter-spacing: -.04em; }.local-signin-card p { color: #d8dbd2; }.local-signin-card small { display: block; margin-top: 18px; color: #8f9489; line-height: 1.5; }
+.local-signin-orbit { position: relative; width: 86px; height: 86px; margin: 28px auto 0; display: grid; place-items: center; border: 1px solid rgba(216,242,106,.35); border-radius: 50%; }.local-signin-orbit i { position: absolute; inset: 8px; border: 1px dashed rgba(216,242,106,.45); border-radius: 50%; animation: novaSpin 4s linear infinite; }.local-signin-orbit b { color: var(--acid); font-size: 24px; }
+@keyframes novaDockIn { from { opacity: 0; transform: translateX(28px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes novaSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .nova-pulse, .local-signin-orbit i { animation: none; } }
