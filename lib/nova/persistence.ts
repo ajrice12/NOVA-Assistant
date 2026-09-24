@@ -11,6 +11,7 @@ export type SupportedCloudProvider = "gmail" | "outlook" | "linkedin";
 
 export type WorkspaceSource = {
   id: string;
+  externalId?: string;
   title: string;
   content: string;
   summary: string;
@@ -312,6 +313,11 @@ export async function getConnection(userId: string, provider: SupportedCloudProv
     WHERE id = ? AND user_id = ? AND provider = ?
   `).bind(connectionId(userId, provider), userId, provider)
     .first<{ id: string; external_account_id: string | null; status: string }>();
+}
+
+export async function updateConnectionStatus(userId: string, provider: SupportedCloudProvider, status: string) {
+  await getDatabase().prepare("UPDATE connector_accounts SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?")
+    .bind(status, Date.now(), connectionId(userId, provider), userId).run();
 }
 
 export async function saveRemoteItems(

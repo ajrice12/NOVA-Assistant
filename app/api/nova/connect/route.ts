@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   if (!config.apiKey || !config.authConfigId) {
     return Response.json({
       code: "setup_required",
-      error: `${body.provider === "gmail" ? "Gmail" : body.provider === "outlook" ? "Outlook" : "LinkedIn"} is ready in NOVA, but its secure connection has not been configured by the product owner yet.`,
+      error: `${body.provider === "gmail" ? "Gmail" : body.provider === "outlook" ? "Outlook" : "LinkedIn"} is ready in Atlas, but its secure connection has not been configured by the product owner yet.`,
     }, { status: 503 });
   }
 
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     await savePendingConnection(user, body.provider, link.connected_account_id);
     return Response.json({ redirectUrl: link.redirect_url, expiresAt: link.expires_at });
   } catch (error) {
-    console.error("NOVA connection failed", error instanceof Error ? error.message : "unknown error");
+    console.error("Atlas connection failed", error instanceof Error ? error.message : "unknown error");
     return Response.json({ error: "The secure connection could not be started. Try again shortly." }, { status: 502 });
   }
 }

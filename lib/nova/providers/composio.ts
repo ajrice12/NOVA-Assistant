@@ -114,17 +114,31 @@ export class ComposioReadOnlyClient {
     });
   }
 
-  listConnectedAccounts(userId: string) {
+  listConnectedAccounts(userId: string, includeInactive = false) {
     const query = new URLSearchParams({ limit: "100" });
     query.append("user_ids", requireOpaqueId(userId, "user ID"));
-    query.append("statuses", "ACTIVE");
-    return this.request<ComposioConnectedAccountList>(`/connected_accounts?${query.toString()}`, { method: "GET" });
+    if (!includeInactive) query.append("statuses", "ACTIVE");
+    return this.listAccountPages(query);
   }
 
-  listAllConnectedAccounts() {
+  listAllConnectedAccounts(includeInactive = false) {
     const query = new URLSearchParams({ limit: "100" });
-    query.append("statuses", "ACTIVE");
-    return this.request<ComposioConnectedAccountList>(`/connected_accounts?${query.toString()}`, { method: "GET" });
+    if (!includeInactive) query.append("statuses", "ACTIVE");
+    return this.listAccountPages(query);
+  }
+
+  private async listAccountPages(query: URLSearchParams): Promise<ComposioConnectedAccountList> {
+    const items: ComposioConnectedAccount[] = [];
+    const cursors = new Set<string>();
+    for (let page = 0; page < 20; page++) {
+      const result = await this.request<ComposioConnectedAccountList>(`/connected_accounts?${query.toString()}`, { method: "GET" });
+      items.push(...result.items);
+      if (!result.next_cursor) return { items };
+      if (cursors.has(result.next_cursor)) throw new Error("Connection pagination did not complete.");
+      cursors.add(result.next_cursor);
+      query.set("cursor", result.next_cursor);
+    }
+    throw new Error("Connection listing exceeded the supported page limit.");
   }
 
   executeActionTool(input: ExecuteActionToolInput) {
@@ -148,6 +162,7 @@ export class ComposioReadOnlyClient {
   private async request<T>(path: string, init: RequestInit): Promise<T> {
     const response = await this.fetcher(`${this.baseUrl}${path}`, {
       ...init,
+      signal: init.signal ?? AbortSignal.timeout(25_000),
       headers: {
         "content-type": "application/json",
         "x-api-key": this.apiKey,

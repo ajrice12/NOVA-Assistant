@@ -10,8 +10,9 @@
     "build": "vinext build",
     "start": "vinext start",
     "test": "npm run test:core && npm run build && node --test tests/rendered-html.test.mjs",
-    "test:core": "node --experimental-strip-types --test tests/nova-core.test.ts",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "test:core": "node --experimental-strip-types --test tests/nova-core.test.ts tests/atlas.test.ts",
+    "typecheck": "node scripts/typecheck.mjs",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern worker-configuration.d.ts",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
