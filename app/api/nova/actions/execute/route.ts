@@ -1,5 +1,8 @@
 import { env } from "cloudflare:workers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { getComposioGmailSendConfig, getComposioProviderConfig } from "@/lib/nova/composio-config";
+import { getConnection } from "@/lib/nova/persistence";
+import { ComposioReadOnlyClient } from "@/lib/nova/providers/composio";
 import { authorizeProposal } from "@/lib/nova-ai/tool-policy";
 import type { NovaActionProposal } from "@/lib/nova-ai/types";
 
@@ -12,5 +15,44 @@ export async function POST(request: Request) {
   if (!decision.allowed) return Response.json({ error: decision.reason, confirmationRequired: true }, { status: 409 });
   const mode = (env as unknown as Record<string, string | undefined>).NOVA_TOOL_EXECUTION_MODE ?? "mock";
   if (mode !== "live") return Response.json({ status: "simulated", receiptId: crypto.randomUUID(), message: "Simulated only; no external provider was contacted." });
-  return Response.json({ error: "Live execution requires an installed, reviewed provider mapping for this intent. Nothing was sent." }, { status: 501 });
+  if (body.proposal.intent !== "SEND_REPLY") return Response.json({ error: "This live action is not installed. Nothing was changed." }, { status: 501 });
+
+  const connection = await getConnection(user.userId, "gmail");
+  if (!connection?.external_account_id || connection.id !== body.proposal.accountId) {
+    return Response.json({ error: "The selected Gmail account is not connected to this NOVA user." }, { status: 403 });
+  }
+  const args = body.proposal.arguments;
+  const recipient = typeof args.recipient_email === "string" ? args.recipient_email.trim() : "";
+  const subject = typeof args.subject === "string" ? args.subject.trim() : "";
+  const message = typeof args.body === "string" ? args.body.trim() : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient) || !subject || !message) {
+    return Response.json({ error: "The confirmed email is incomplete. Nothing was sent." }, { status: 400 });
+  }
+
+  try {
+    const config = getComposioGmailSendConfig();
+    let composioUserId = user.userId;
+    if (user.userId === "local-development-user") {
+      const discoveryConfig = getComposioProviderConfig("gmail");
+      const discoveryClient = new ComposioReadOnlyClient({ apiKey: discoveryConfig.apiKey, readToolAllowlist: [discoveryConfig.toolSlug] });
+      const accounts = await discoveryClient.listAllConnectedAccounts();
+      const account = accounts.items.find((item) => item.id === connection.external_account_id && item.status === "ACTIVE" && item.toolkit.slug.toLowerCase() === "gmail");
+      if (!account) throw new Error("Connected Gmail account unavailable.");
+      composioUserId = account.user_id;
+    }
+    const client = new ComposioReadOnlyClient({ apiKey: config.apiKey, readToolAllowlist: [getComposioProviderConfig("gmail").toolSlug], writeToolAllowlist: [config.toolSlug] });
+    const result = await client.executeActionTool({
+      toolSlug: config.toolSlug,
+      version: config.toolVersion,
+      connectedAccountId: connection.external_account_id,
+      userId: composioUserId,
+      confirmed: true,
+      arguments: { recipient_email: recipient, subject, body: message, is_html: false, user_id: "me" },
+    });
+    if (!result.successful) throw new Error(result.error || "Gmail rejected the message.");
+    return Response.json({ status: "sent", receiptId: result.log_id ?? crypto.randomUUID(), message: "Sent through Gmail." });
+  } catch (error) {
+    console.error("NOVA Gmail send failed", error instanceof Error ? error.message : "unknown error");
+    return Response.json({ error: "Gmail could not send the message. Nothing was marked as sent." }, { status: 502 });
+  }
 }

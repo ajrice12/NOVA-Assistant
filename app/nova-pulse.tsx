@@ -11,6 +11,7 @@ type PulseData = PulseWorkspace & {
 
 type ChatReference = { id: string; title: string; source: string; summary: string; priority: string; why: string; requiresResponse: boolean; canonicalUrl?: string };
 type Draft = { recipient: string; subject: string; tone: string; body: string };
+type SendProposal = { id: string; intent: "SEND_REPLY"; risk: string; accountId: string; targetId: string; summary: string; arguments: Record<string, unknown>; status: "proposed" };
 
 const AUTO_SYNC_PRIORITY: readonly SyncProvider[] = ["gmail", "linkedin"];
 const EMAIL_PROVIDERS: readonly SyncProvider[] = ["gmail"];
@@ -35,6 +36,8 @@ export default function NovaPulse() {
   const [answer, setAnswer] = useState("");
   const [references, setReferences] = useState<ChatReference[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [composing, setComposing] = useState(false);
+  const [sendProposal, setSendProposal] = useState<SendProposal | null>(null);
   const [lastChecked, setLastChecked] = useState<number | null>(null);
   const automaticSyncInFlight = useRef(false);
 
@@ -180,6 +183,42 @@ export default function NovaPulse() {
     finally { setChecking(false); }
   }
 
+  function startCompose() {
+    setDraft({ recipient: "", subject: "", tone: "professional", body: "" });
+    setSendProposal(null);
+    setComposing(true);
+    setOpen(true);
+    setAnswer("Write your email below. Nothing will be sent until you review and confirm it.");
+  }
+
+  async function reviewSend() {
+    if (!draft || !data) return;
+    const gmail = data.connections.find((connection) => connection.provider === "gmail" && connection.status === "active");
+    if (!gmail) { setAnswer("Connect Gmail before sending."); return; }
+    setChecking(true);
+    try {
+      const response = await fetch("/api/nova/actions/propose", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ intent: "SEND_REPLY", accountId: gmail.id, targetId: draft.recipient, summary: `Send Gmail to ${draft.recipient}: ${draft.subject}`, arguments: { recipient_email: draft.recipient, subject: draft.subject, body: draft.body } }) });
+      const payload = await response.json() as SendProposal & { error?: string };
+      if (!response.ok) throw new Error(payload.error || "The email is not ready to review.");
+      setSendProposal(payload);
+      setAnswer("Review the exact recipient, subject, and message. Confirm Send only if everything is correct.");
+    } catch (error) { setAnswer(error instanceof Error ? error.message : "The email is not ready to review."); }
+    finally { setChecking(false); }
+  }
+
+  async function confirmSend() {
+    if (!sendProposal) return;
+    setChecking(true);
+    try {
+      const response = await fetch("/api/nova/actions/execute", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ proposal: sendProposal, confirmedProposalId: sendProposal.id }) });
+      const payload = await response.json() as { status?: string; message?: string; error?: string };
+      if (!response.ok) throw new Error(payload.error || "Gmail did not send the message.");
+      setAnswer(payload.status === "sent" ? "✓ Sent through Gmail." : payload.message || "Simulated only; nothing was sent.");
+      setDraft(null); setSendProposal(null); setComposing(false);
+    } catch (error) { setAnswer(error instanceof Error ? error.message : "Gmail did not send the message."); }
+    finally { setChecking(false); }
+  }
+
   if (!open) {
     return <button className="nova-pulse-launcher" onClick={() => setOpen(true)} aria-label="Open NOVA Pulse reports">
       <span>✦</span><strong>NOVA</strong><small>Open assistant</small>{report?.badgeCount ? <b>{report.badgeCount}</b> : null}
@@ -211,7 +250,7 @@ export default function NovaPulse() {
           <div><span>{item.source}</span><b>{item.priority}</b></div><strong>{item.title}</strong><p>{item.summary}</p><small>{item.why}</small>
           <footer>{item.canonicalUrl ? <a href={item.canonicalUrl} target="_blank" rel="noreferrer">View</a> : null}{item.requiresResponse ? <button onClick={() => void createDraft(item)}>Draft reply</button> : null}</footer>
         </article>)}
-        {draft ? <article className="nova-draft"><header><span>DRAFT · {draft.tone}</span><b>Not sent</b></header><input aria-label="Draft subject" value={draft.subject} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}/><textarea aria-label="Draft response" value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })}/><footer><button onClick={() => setDraft(null)}>Cancel</button><button onClick={() => setAnswer("Sending requires a connected write-capable account and a separate confirmation. Nothing was sent.")}>Review send</button></footer></article> : null}
+        {draft ? <article className="nova-draft"><header><span>DRAFT · {draft.tone}</span><b>{sendProposal ? "Confirm send" : "Not sent"}</b></header>{composing ? <input aria-label="Recipient email" type="email" placeholder="Recipient email" value={draft.recipient} disabled={Boolean(sendProposal)} onChange={(event) => setDraft({ ...draft, recipient: event.target.value })}/> : null}<input aria-label="Draft subject" value={draft.subject} disabled={Boolean(sendProposal)} onChange={(event) => setDraft({ ...draft, subject: event.target.value })}/><textarea aria-label="Draft response" value={draft.body} disabled={Boolean(sendProposal)} onChange={(event) => setDraft({ ...draft, body: event.target.value })}/><footer><button onClick={() => { setDraft(null); setSendProposal(null); setComposing(false); }}>Cancel</button>{sendProposal ? <><button onClick={() => setSendProposal(null)}>Edit</button><button onClick={() => void confirmSend()} disabled={checking}>Confirm Send</button></> : <button onClick={() => void reviewSend()} disabled={checking}>Review send</button>}</footer></article> : null}
       </>}
     </div>
 
@@ -219,6 +258,7 @@ export default function NovaPulse() {
       <div className="nova-suggestions"><button onClick={() => setQuestion("What needs my attention?")}>What needs attention?</button><button onClick={() => setQuestion("Show messages waiting on me")}>Waiting on me</button><button onClick={() => setQuestion("Summarize recruiting messages")}>Recruiting</button></div>
       <div className="nova-pulse-actions">
         <button onClick={() => void checkEmail()} disabled={checking || !data}>{checking ? "Checking…" : "Check email"}</button>
+        <button onClick={startCompose} disabled={checking || !data}>Compose email</button>
         <button onClick={() => void load()} disabled={loading}>Refresh reports</button>
       </div>
       <form className="nova-pulse-form" onSubmit={ask}>

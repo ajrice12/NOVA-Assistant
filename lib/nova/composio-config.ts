@@ -53,6 +53,15 @@ export function getComposioProviderConfig(provider: SupportedCloudProvider) {
   };
 }
 
+export function getComposioGmailSendConfig() {
+  const values = runtimeEnv();
+  return {
+    apiKey: values.COMPOSIO_API_KEY?.trim() ?? "",
+    toolSlug: values.COMPOSIO_GMAIL_SEND_TOOL?.trim() || "GMAIL_SEND_EMAIL",
+    toolVersion: values.COMPOSIO_GMAIL_SEND_TOOL_VERSION?.trim() || "20260903_00",
+  };
+}
+
 export function isSupportedCloudProvider(value: unknown): value is SupportedCloudProvider {
   return value === "gmail" || value === "outlook" || value === "linkedin";
 }
