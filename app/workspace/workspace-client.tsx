@@ -69,6 +69,14 @@ export default function WorkspaceClient({ user }: { user: { displayName: string;
     return () => { window.clearTimeout(timer); document.removeEventListener("keydown", keydown); abortChat.current?.abort(); };
   }, []);
   useEffect(() => { if (!themeReady) return; document.documentElement.dataset.atlasTheme = theme; try { localStorage.setItem("atlas:theme", theme); } catch { /* Optional preference. */ } }, [theme, themeReady]);
+  useEffect(() => {
+    if (!window.atlasDesktop?.isNative) return;
+    document.documentElement.classList.add("atlas-native");
+    const unsubscribe = window.atlasDesktop.onSurface(next => setSurface(next));
+    void window.atlasDesktop.getConfig().then(config => setSurface(config.surface));
+    return () => { unsubscribe(); document.documentElement.classList.remove("atlas-native"); };
+  }, []);
+  useEffect(() => { window.atlasDesktop?.setSurface(surface); }, [surface]);
   useEffect(() => { if (!sessionReady) return; try { localStorage.setItem("atlas:surface", surface); sessionStorage.setItem("atlas:session", JSON.stringify({ turns: turns.slice(-24), selectedId })); } catch { /* Optional continuity. */ } }, [surface, turns, selectedId, sessionReady]);
   function openSource(id: string) { const source = sources.find(s => s.id === id); if (!source) { ws.setNotice("That source is no longer in this workspace. Refresh and try again."); return; } if (["email", "message"].includes(source.sourceType)) { setSelectedId(id); navigate("inbox"); } else { setKnowledgeSource(source); navigate("knowledge"); } }
   async function ask(text: string, sourceId?: string) {

@@ -94,3 +94,15 @@
 @keyframes atlas-edge-breathe { 50% { box-shadow: 0 18px 55px #0008,0 0 0 6px var(--atlas-active); } } @keyframes atlas-brief-in { from { opacity: 0; transform: translateX(25px) scale(.985); } to { opacity: 1; transform: none; } }
 @media(max-width:600px) { .atlas-brief { inset: 6px; width: auto; border-radius: 16px; }.atlas-edge { right: 7px; }.workspace-minimize { right: 66px; bottom: 19px; }.surface-edge .atlas-sidebar,.surface-brief .atlas-sidebar { display: none; } }
 @media(prefers-reduced-motion:reduce) { .atlas-edge { animation: none; } }
+
+/* Native Electron host: the desktop window itself supplies the surrounding surface. */
+.native-drag-handle { display: none; }
+html.atlas-native,html.atlas-native body { background: transparent !important; overflow: hidden; }
+html.atlas-native .surface-edge,html.atlas-native .surface-brief { background: transparent; }
+html.atlas-native .surface-edge .atlas-sidebar,html.atlas-native .surface-edge .atlas-main,html.atlas-native .surface-brief .atlas-sidebar,html.atlas-native .surface-brief .atlas-main { display: none; }
+html.atlas-native .surface-edge .atlas-edge { right: 14px; top: 50%; }
+html.atlas-native .surface-edge .native-drag-handle { display: block; position: fixed; z-index: 90; top: 4px; left: 25px; width: 36px; height: 9px; border-radius: 5px; background: color-mix(in srgb,var(--atlas-muted) 35%,transparent); -webkit-app-region: drag; cursor: grab; }
+html.atlas-native .surface-brief .brief-scrim { display: none; }
+html.atlas-native .surface-brief .atlas-brief { inset: 8px; width: auto; }
+html.atlas-native .surface-brief .atlas-brief > .native-drag-handle { display: block; position: absolute; z-index: 4; top: 5px; left: 50%; width: 42px; height: 5px; margin-left: -21px; border-radius: 3px; background: color-mix(in srgb,var(--atlas-muted) 45%,transparent); -webkit-app-region: drag; cursor: grab; }
+html.atlas-native button,html.atlas-native input,html.atlas-native textarea,html.atlas-native select,html.atlas-native a { -webkit-app-region: no-drag; }
