@@ -24,6 +24,9 @@ let currentSurface = "edge";
 if (!process.env.ATLAS_DESKTOP_USER_DATA) app.setPath("userData", path.join(__dirname, "..", ".atlas-desktop-data"));
 else app.setPath("userData", process.env.ATLAS_DESKTOP_USER_DATA);
 
+const hasInstanceLock = app.requestSingleInstanceLock();
+if (!hasInstanceLock) app.quit();
+
 function statePath() { return path.join(app.getPath("userData"), "window-state.json"); }
 function readState() {
   try { return JSON.parse(fs.readFileSync(statePath(), "utf8")); } catch { return {}; }
@@ -81,7 +84,7 @@ function createWindow() {
       devTools: process.env.NODE_ENV !== "production",
     },
   });
-  const atlasUrl = process.env.ATLAS_DESKTOP_URL || "http://localhost:3001/?desktop=1#chat";
+  const atlasUrl = process.env.ATLAS_DESKTOP_URL || "http://localhost:3000/?desktop=1#chat";
   const allowedOrigin = new URL(atlasUrl).origin;
   mainWindow.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: "deny" }; });
   mainWindow.webContents.on("will-navigate", (event, url) => { if (new URL(url).origin !== allowedOrigin) { event.preventDefault(); shell.openExternal(url); } });
@@ -108,12 +111,19 @@ function createTray() {
 }
 
 app.whenReady().then(() => {
+  if (!hasInstanceLock) return;
   ipcMain.on("atlas:set-surface", (_event, surface) => setSurface(surface, false));
   ipcMain.handle("atlas:get-config", () => ({ shortcut: process.env.ATLAS_SHORTCUT || "Ctrl+Alt+A", surface: currentSurface }));
   createWindow();
   try { createTray(); } catch (error) { console.warn("Atlas tray is unavailable:", error); }
   const shortcut = process.env.ATLAS_SHORTCUT || "Ctrl+Alt+A";
   if (!globalShortcut.register(shortcut, toggleBrief)) console.warn(`Atlas could not register ${shortcut}.`);
+});
+app.on("second-instance", () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  setSurface("brief");
+  mainWindow.focus();
 });
 app.on("activate", () => mainWindow ? setSurface("brief") : createWindow());
 app.on("before-quit", () => { quitting = true; saveState(); globalShortcut.unregisterAll(); });

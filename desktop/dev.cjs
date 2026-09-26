@@ -2,14 +2,16 @@
 const { spawn } = require("node:child_process");
 const electron = require("electron");
 
-const url = process.env.ATLAS_DESKTOP_URL || "http://localhost:3001";
+const url = process.env.ATLAS_DESKTOP_URL || "http://localhost:3000";
 let server;
 async function ready() {
   try { return (await fetch(url, { signal: AbortSignal.timeout(1000) })).ok; } catch { return false; }
 }
 (async () => {
   if (!(await ready())) {
-    server = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev"], { stdio: "inherit", env: process.env });
+    const command = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "npm";
+    const args = process.platform === "win32" ? ["/d", "/s", "/c", "npm run dev"] : ["run", "dev"];
+    server = spawn(command, args, { stdio: "inherit", env: process.env });
     for (let attempt = 0; attempt < 60 && !(await ready()); attempt += 1) await new Promise(resolve => setTimeout(resolve, 1000));
     if (!(await ready())) { console.error("Atlas development server did not start."); server.kill(); process.exit(1); }
   }

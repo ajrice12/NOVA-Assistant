@@ -4,7 +4,7 @@ The Electron host turns the existing Atlas web application into a native Windows
 
 ## Run locally
 
-If Atlas is already running at `http://localhost:3001`:
+If Atlas is already running at `http://localhost:3000`:
 
 ```sh
 npm run desktop
@@ -15,6 +15,14 @@ To start the Atlas development server when needed and then launch the companion:
 ```sh
 npm run desktop:dev
 ```
+
+To start the current Atlas installation automatically at Windows sign-in:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File desktop\startup\install-startup.ps1
+```
+
+The installer removes the two legacy Nova startup launchers and creates one hidden `Atlas Companion.vbs` entry. It points to the current installation's `Atlas Runner.ps1`, launches `desktop:dev`, and records startup results in `.atlas-desktop-data/startup.log`. Electron's single-instance lock prevents duplicate companions.
 
 Set `ATLAS_DESKTOP_URL` to use a deployed Atlas origin. Set `ATLAS_SHORTCUT` to an Electron accelerator string to replace the default `Ctrl+Alt+A` shortcut.
 
