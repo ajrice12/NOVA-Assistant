@@ -45,15 +45,22 @@ export function sourceIntelligence(source: Source): MessageIntelligence {
     body: source.content, timestamp: new Date(source.occurredAt).toISOString(), unread: false });
 }
 export function buildBriefing(sources: Source[]) {
-  const messages = sources.filter(s => s.sourceType === "email" || s.sourceType === "message");
-  const ranked = messages.map(source => ({ source, intelligence: sourceIntelligence(source) }))
-    .sort((a, b) => b.intelligence.priorityScore - a.intelligence.priorityScore || b.source.occurredAt - a.source.occurredAt);
+  const { messages, ranked, important, remaining } = rankInboxSources(sources);
   const attention = ranked.filter(item => !item.intelligence.isAutomated && (item.intelligence.requiresResponse || ["high", "critical"].includes(item.intelligence.priority)));
   const replies = ranked.filter(item => item.intelligence.requiresResponse).length;
   const text = !messages.length ? "Your workspace is ready. Connect an account to see what deserves your attention."
     : attention.length ? `${attention.length === 1 ? "One message may need" : `${attention.length} messages may need`} your attention.${replies ? ` ${replies === 1 ? "One looks" : `${replies} look`} like ${replies === 1 ? "it needs a reply" : "they need replies"}.` : " Start with the items below."}`
     : "No urgent signals in your saved messages. Take a breath, then choose what to work on.";
-  return { text, ranked, attention, replies, suggestions: replies ? ["What should I handle first?", "Which messages need replies?", "Summarize my inbox"] : ["Summarize my inbox", "Find interview messages", "Review my saved knowledge"] };
+  return { text, ranked, important, remaining, attention, replies, suggestions: replies ? ["What should I handle first?", "Which messages need replies?", "Summarize my inbox"] : ["Summarize my inbox", "Find interview messages", "Review my saved knowledge"] };
+}
+export function rankInboxSources(sources: Source[]) {
+  const messages = sources.filter(source => source.sourceType === "email" || source.sourceType === "message");
+  const ranked = messages.map(source => ({ source, intelligence: sourceIntelligence(source) }))
+    .sort((a, b) => b.intelligence.priorityScore - a.intelligence.priorityScore || b.source.occurredAt - a.source.occurredAt);
+  const important = ranked.filter(item => !item.intelligence.isAutomated && item.intelligence.priorityScore >= 62).slice(0, 5);
+  const importantIds = new Set(important.map(item => item.source.id));
+  const remaining = ranked.filter(item => !importantIds.has(item.source.id));
+  return { messages, ranked, important, remaining };
 }
 export function relativeTime(value: number | null, now = Date.now()) {
   if (!value) return "Not synced yet";

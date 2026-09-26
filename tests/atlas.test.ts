@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { chooseAccount, restoredStatus } from "../lib/atlas/connections.ts";
-import { buildBriefing, connectionStatus, syncCandidates, safeSourceUrl, type Source } from "../lib/atlas/workspace.ts";
+import { buildBriefing, connectionStatus, rankInboxSources, syncCandidates, safeSourceUrl, type Source } from "../lib/atlas/workspace.ts";
 import { workspaceToChatContext } from "../lib/nova-ai/context-builder.ts";
 import { answerFromContext } from "../lib/nova-ai/response-generator.ts";
 import { parseSourceTitle } from "../lib/nova-ai/source-title.ts";
@@ -32,6 +32,15 @@ test("briefing is based on actual messages and has an honest empty state", () =>
   assert.equal(buildBriefing([{ ...source, sourceType: "note" }]).replies, 0);
   const promotion = { ...source, title: "40% off sitewide — Store <news@marketing.example>", content: "Limited-time deal. Manage preferences.", summary: "A promotional sale." };
   assert.equal(buildBriefing([promotion]).attention.length, 0);
+});
+test("priority ranking separates important messages without hiding the rest", () => {
+  const routine = { ...source, id: "routine", title: "Weekly update — Team <updates@example.com>", content: "Here is the weekly digest. Unsubscribe here.", summary: "Weekly update.", occurredAt: Date.now() - 3_600_000 };
+  const urgent = { ...source, id: "urgent", title: "Security alert — Bank <alerts@bank.example>", content: "Unusual activity detected. Please confirm today.", summary: "Confirm unusual activity." };
+  const result = rankInboxSources([routine, source, urgent]);
+  assert.equal(result.ranked[0].source.id, "urgent");
+  assert.ok(result.important.some(item => item.source.id === "urgent"));
+  assert.ok(result.remaining.some(item => item.source.id === "routine"));
+  assert.equal(result.important.length + result.remaining.length, 3);
 });
 test("sender parsing uses the title suffix, not arbitrary body addresses", () => {
   assert.deepEqual(parseSourceTitle(source.title), { subject: "Interview", sender: "Amy", address: "amy@example.com" });
