@@ -120,7 +120,7 @@ app.whenReady().then(() => {
   if (!globalShortcut.register(shortcut, toggleBrief)) console.warn(`Atlas could not register ${shortcut}.`);
 });
 app.on("second-instance", () => {
-  if (!mainWindow) return;
+  if (!mainWindow || mainWindow.isDestroyed()) { createWindow(); return; }
   if (mainWindow.isMinimized()) mainWindow.restore();
   setSurface("brief");
   mainWindow.focus();
